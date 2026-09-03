@@ -1,0 +1,84 @@
+channel,message_id,timestamp_utc,direction,symbol,entry,tp1,tp2,tp3,sl,raw_text,parse_confidence
+@fxtradingvision,84212,2026-09-02T14:09:23Z,LONG,XAUUSD,4370.0,4398.0,4399.0,4430.0,4370.0,"NEW TRADE IDEA
+
+XAUUSD BUY 4394
+
+TP 1 4398
+TP 2 4399
+TP 3 4430
+
+SL @ 4370
+
+Trade accordingly and only trade with money you can afford to LOSE.
+
+DOUBLE LOTSIZE.",1.0
+@fxtradingvision,84239,2026-09-03T08:11:14Z,LONG,XAUUSD,4310.0,4438.0,4439.0,4480.0,4310.0,"NEW TRADE IDEA
+
+XAUUSD BUY 4434
+
+TP 1 4438
+TP 2 4439
+TP 3 4480
+
+SL @ 4310
+
+Trade accordingly and only trade with money you can afford to LOSE.
+
+DOUBLE LOTSIZE.",1.0
+@fxtradingvision,84255,2026-09-03T09:57:09Z,LONG,XAUUSD,4400.0,4429.0,4430.0,4475.0,4400.0,"NEW TRADE IDEA
+
+XAUUSD BUY 4425
+
+TP 1 4429
+TP 2 4430
+TP 3 4475
+
+SL @ 4400
+
+Trade accordingly and only trade with money you can afford to LOSE.
+
+DOUBLE LOTSIZE.",1.0
+@fxtradingvision,84278,2026-09-03T11:37:08Z,LONG,XAUUSD,4410.0,4439.0,4440.0,4475.0,4410.0,"NEW TRADE IDEA
+
+XAUUSD BUY 4435
+
+TP 1 4439
+TP 2 4440
+TP 3 4475
+
+SL @ 4410
+
+Trade accordingly and only trade with money you can afford to LOSE.",1.0
+@fxtradingvision,84290,2026-09-03T12:21:47Z,LONG,XAUUSD,4415.0,4442.0,4443.0,4470.0,4415.0,"NEW TRADE IDEA
+
+XAUUSD BUY 4438
+
+TP 1 4442
+TP 2 4443
+TP 3 4470
+
+SL @ 4415
+
+Trade accordingly and only trade with money you can afford to LOSE.",1.0
+@fxtradingvision,84311,2026-09-03T13:46:48Z,LONG,XAUUSD,4440.0,4468.0,4469.0,4500.0,4440.0,"NEW TRADE IDEA
+
+XAUUSD BUY 4464
+
+TP 1 4468
+TP 2 4469
+TP 3 4500
+
+SL @ 4440
+
+Trade accordingly and only trade with money you can afford to LOSE.",1.0
+@fxtradingvision,84317,2026-09-03T14:54:33Z,LONG,XAUUSD,4455.0,4479.0,4480.0,4500.0,4455.0,"NEW TRADE IDEA
+
+XAUUSD BUY 4475
+
+TP 1 4479
+TP 2 4480
+TP 3 4500
+
+SL @ 4455
+
+Trade accordingly and only trade with money you can afford to LOSE.",1.0
