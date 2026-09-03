@@ -55,6 +55,8 @@ OUT_COLUMNS = [
     "entry_stated",
     "entry_price",
     "tp1",
+    "tp2",
+    "tp3",
     "sl",
     "outcome",
     "exit_time_utc",
@@ -64,12 +66,35 @@ OUT_COLUMNS = [
     "points_net",
     "bars_held",
     "same_candle_conflict",
+    # Counterfactual: did price reach TP2/TP3 before the stop or the deadline,
+    # under a hold-through-TP1 rule? Context only -- expectancy still exits at
+    # TP1. Empty when the signal never specified that level.
+    "tp2_hit",
+    "tp3_hit",
+    "best_price_reached",
     "scored_at_utc",
 ]
 
 
 def now_utc() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def opt_float(value):
+    """Optional numeric cell -> float or None. parse.py leaves absent levels blank."""
+    if value is None or str(value).strip() == "":
+        return None
+    try:
+        return float(value)
+    except ValueError:
+        return None
+
+
+def level_reached(level, best_price, is_long):
+    """Did the favourable excursion reach this level? '' when undefined."""
+    if level is None:
+        return ""
+    return "yes" if (best_price >= level if is_long else best_price <= level) else "no"
 
 
 def load_prices() -> pd.DataFrame:
@@ -107,15 +132,49 @@ def load_prices() -> pd.DataFrame:
 
 
 def load_scored_keys():
+    """Keys already scored. Also migrates a scored.csv written by an older
+    schema: appending to a narrower header would misalign every new row, so the
+    file is widened in place with the new cells left blank."""
     if not SCORED_CSV.exists():
         return set()
     with SCORED_CSV.open("r", encoding="utf-8", newline="") as fh:
-        return {(r["channel"], r["message_id"]) for r in csv.DictReader(fh)}
+        reader = csv.DictReader(fh)
+        header = reader.fieldnames or []
+        rows = [dict(r) for r in reader]
+
+    unknown = [c for c in header if c not in OUT_COLUMNS]
+    if unknown:
+        sys.exit(
+            f"[fatal] {SCORED_CSV} has unrecognised column(s) {unknown}; "
+            f"refusing to append to it"
+        )
+    if header and header != OUT_COLUMNS:
+        with SCORED_CSV.open("w", encoding="utf-8", newline="") as fh:
+            writer = csv.DictWriter(fh, fieldnames=OUT_COLUMNS)
+            writer.writeheader()
+            for row in rows:
+                writer.writerow({c: row.get(c, "") for c in OUT_COLUMNS})
+        added = [c for c in OUT_COLUMNS if c not in header]
+        print(f"[info] widened {SCORED_CSV} schema; new blank column(s): {added}")
+
+    return {(r["channel"], r["message_id"]) for r in rows}
 
 
 def walk(signal, times, o, h, l, c):
-    """Walk the price path forward. Returns a result dict, or None when the
-    trade cannot be resolved yet (data does not reach far enough)."""
+    """Walk the price path forward from the signal timestamp.
+
+    Returns a result dict, or None when the trade cannot be resolved yet
+    (the price data does not reach far enough to settle it).
+
+    The walk answers two separate questions in one pass:
+
+    1. The trade itself: did TP1 or SL come first? That decides the outcome and
+       is the only thing expectancy is built from.
+    2. The counterfactual for TP2/TP3: how far did price run in the trade's
+       favour before SL or the 48h deadline closed the position, *ignoring* the
+       TP1 exit? That is a hold-through-TP1 variant, reported for context only.
+       It never feeds expectancy -- the scored trade still exits at TP1.
+    """
     ts = signal["ts"]
     if ts < times[0]:
         return {"unresolvable": "before_data_window"}
@@ -129,56 +188,57 @@ def walk(signal, times, o, h, l, c):
     is_long = signal["direction"] == "LONG"
     tp1, sl = signal["tp1"], signal["sl"]
 
+    resolution = None            # first TP1-or-SL event: the trade's outcome
+    excursion = entry_price      # best price seen while the position could be open
     last_close, last_time, bars = float(c[i]), times[i], 0
+    path_complete = False
 
     for j in range(i, len(times)):
         if times[j] > deadline:
-            return {
-                "outcome": "TIMEOUT",
-                "entry_price": entry_price,
-                "exit_price": last_close,
-                "exit_time": last_time,
-                "bars": bars,
-                "conflict": False,
-            }
+            path_complete = True
+            break
         bars = j - i + 1
         last_close, last_time = float(c[j]), times[j]
         high, low = float(h[j]), float(l[j])
+        excursion = max(excursion, high) if is_long else min(excursion, low)
 
         tp_hit = high >= tp1 if is_long else low <= tp1
         sl_hit = low <= sl if is_long else high >= sl
 
-        if tp_hit and sl_hit:
-            # Both levels inside one candle: order unknowable -> call it a loss.
-            return {
-                "outcome": "LOSS",
-                "entry_price": entry_price,
-                "exit_price": sl,
-                "exit_time": times[j],
-                "bars": bars,
-                "conflict": True,
-            }
-        if tp_hit:
-            return {
-                "outcome": "WIN",
-                "entry_price": entry_price,
-                "exit_price": tp1,
-                "exit_time": times[j],
-                "bars": bars,
-                "conflict": False,
-            }
-        if sl_hit:
-            return {
-                "outcome": "LOSS",
-                "entry_price": entry_price,
-                "exit_price": sl,
-                "exit_time": times[j],
-                "bars": bars,
-                "conflict": False,
-            }
+        if resolution is None:
+            if tp_hit and sl_hit:
+                # Both levels inside one candle: order unknowable -> loss.
+                resolution = ("LOSS", sl, times[j], bars, True)
+            elif tp_hit:
+                resolution = ("WIN", tp1, times[j], bars, False)
+            elif sl_hit:
+                resolution = ("LOSS", sl, times[j], bars, False)
 
-    # Ran out of candles before the 48h deadline: still open, score it later.
-    return None
+        if sl_hit:
+            # Position is out on the stop; the excursion stops here too.
+            path_complete = True
+            break
+
+    if not path_complete:
+        # Ran out of candles before the stop or the deadline. The trade may
+        # already have touched TP1, but the TP2/TP3 path is still unfinished,
+        # so leave it unscored and settle it on a later run.
+        return None
+
+    if resolution is None:
+        outcome, exit_price, exit_time, conflict = "TIMEOUT", last_close, last_time, False
+    else:
+        outcome, exit_price, exit_time, bars, conflict = resolution
+
+    return {
+        "outcome": outcome,
+        "entry_price": entry_price,
+        "exit_price": exit_price,
+        "exit_time": exit_time,
+        "bars": bars,
+        "conflict": conflict,
+        "excursion": excursion,
+    }
 
 
 def main():
@@ -218,6 +278,8 @@ def main():
                 "symbol": symbol,
                 "entry_stated": row.get("entry", ""),
                 "tp1": float(row["tp1"]),
+                "tp2": opt_float(row.get("tp2")),
+                "tp3": opt_float(row.get("tp3")),
                 "sl": float(row["sl"]),
             }
         )
@@ -268,9 +330,10 @@ def main():
                 out_of_window += 1
                 continue
 
+            is_long = signal["direction"] == "LONG"
             gross = (
                 result["exit_price"] - result["entry_price"]
-                if signal["direction"] == "LONG"
+                if is_long
                 else result["entry_price"] - result["exit_price"]
             )
             net = gross - COST_POINTS
@@ -284,6 +347,8 @@ def main():
                     "entry_stated": signal["entry_stated"],
                     "entry_price": round(result["entry_price"], 3),
                     "tp1": signal["tp1"],
+                    "tp2": "" if signal["tp2"] is None else signal["tp2"],
+                    "tp3": "" if signal["tp3"] is None else signal["tp3"],
                     "sl": signal["sl"],
                     "outcome": result["outcome"],
                     "exit_time_utc": result["exit_time"].strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -293,6 +358,13 @@ def main():
                     "points_net": round(net, 3),
                     "bars_held": result["bars"],
                     "same_candle_conflict": "yes" if result["conflict"] else "no",
+                    "tp2_hit": level_reached(
+                        signal["tp2"], result["excursion"], is_long
+                    ),
+                    "tp3_hit": level_reached(
+                        signal["tp3"], result["excursion"], is_long
+                    ),
+                    "best_price_reached": round(result["excursion"], 3),
                     "scored_at_utc": scored_at,
                 }
             )

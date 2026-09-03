@@ -42,10 +42,11 @@ renegotiated once the numbers come in.
 
 | File | Role |
 | --- | --- |
-| `.github/workflows/capture.yml` | Cron every 20 minutes + manual dispatch |
+| `.github/workflows/capture.yml` | Two jobs: `capture` every 20 minutes, then `report` |
 | `capture.py` | Telegram -> `raw_messages.csv` (append-only) |
 | `parse.py` | `raw_messages.csv` -> `signals.csv` |
-| `score.py` | `signals.csv` + price data -> `scored.csv` + report |
+| `score.py` | `signals.csv` + price data -> `scored.csv` + console report |
+| `dashboard.py` | the CSVs -> `report.html` (self-contained, offline) |
 | `channels.txt` | One `@username` per line, `#` for comments |
 
 Data files, created on first run:
@@ -53,6 +54,7 @@ Data files, created on first run:
 - `raw_messages.csv` — the evidence log. Never edit this by hand.
 - `signals.csv` — derived, regenerated from scratch on every parse.
 - `scored.csv` — append-only; a signal already scored is never re-scored.
+- `report.html` — derived, rewritten on every report run.
 
 ---
 
@@ -110,19 +112,83 @@ must already be a member of each one — `capture.py` does not join anything.
 Add a channel the day you start paying. Backfill is limited to the last 100
 messages, and anything deleted before your first capture is gone for good.
 
-### 4. Running
+### 4. Enable GitHub Pages
 
-The workflow runs itself every 20 minutes and commits changed CSVs back to the
-branch. To analyse:
+Settings → Pages → **Source: GitHub Actions**. Nothing else to configure; the
+`report` job publishes the page itself.
+
+On the free tier Pages only serves **public** repositories. That is worth a
+moment's thought before flipping it on: this repo stores the captured message
+text of the groups you are auditing, so a public repo publishes their posts —
+and your deletion evidence — to anyone who finds the URL. Keep the repo private
+and skip Pages (the committed `report.html` still opens locally) if that is not
+what you want.
+
+### 5. Running
+
+Both jobs run themselves. `capture` polls Telegram every 20 minutes and commits
+changed CSVs; `report` then parses, scores, renders `report.html`, commits it,
+and deploys it to Pages. To do the same locally:
 
 ```bash
 pip install telethon pandas yfinance
-python parse.py    # rebuilds signals.csv, prints unparsed counts per channel
-python score.py    # appends to scored.csv, prints the report
+python parse.py       # rebuilds signals.csv, prints unparsed counts per channel
+python score.py       # appends to scored.csv, prints the console report
+python dashboard.py   # writes report.html
 ```
 
-Or run the workflow manually with **Run analysis** ticked, which does the same
-thing in CI.
+A manual run (**Actions → capture → Run workflow**) takes a
+`position_size_chf` input, default `100`, which pre-fills the report's
+calculator.
+
+---
+
+## Viewing the report
+
+Once Pages is enabled, the report lives at:
+
+```
+https://<your-github-username>.github.io/<repository-name>/
+https://<your-github-username>.github.io/<repository-name>/report.html
+```
+
+Both URLs serve the same page — the root is an `index.html` copy, so a bare
+link works. For this repository that is
+`https://hallohallo2010-cmd.github.io/Signal-Backtesting-Ai-with-Telegram/`.
+
+**The report updates every 20 minutes automatically**, on the same schedule as
+capture: the `report` job runs after every `capture` job, re-scores whatever is
+new, and redeploys the page. Nothing to click. As with the cron itself,
+GitHub's scheduler is best effort, so "every 20 minutes" means "roughly" — the
+page footer carries the generation timestamp, and that is the one to trust.
+
+`report.html` is also committed to the repository on every run, so you can open
+it straight from a local clone. It is fully self-contained — one file, no CDN,
+no external stylesheet, no font to fetch — so it renders identically offline
+and on an iPad in Safari.
+
+What is on the page:
+
+1. **Per-channel summary** — signals, scored trades, TP1/TP2/TP3 and SL hit
+   counts, win rate, and average points per trade both raw and with the best
+   two trades removed. Channels under 50 trades are stamped
+   VERDICT WITHHELD.
+2. **Position size calculator** — type what you risk per trade and the CHF per
+   point, and the expected return per trade, over 50 trades, and the 10-trade
+   best and worst streaks all update live. Each streak also shows the worst and
+   best run of 10 that actually happened, which for a negative channel is
+   usually the more sobering number.
+3. **Equity curve** — cumulative net points per channel, trade by trade, drawn
+   as plain SVG. A channel with negative expectancy ends in a red zone. Tap
+   any point to read that trade.
+4. **Deletion and edit log** — every message the channel changed or removed
+   after posting, with the gap between posting and tampering, and the original
+   text as first captured.
+
+A caveat on the TP2/TP3 columns: they are counterfactual. A scored trade exits
+at TP1, so those columns only record whether price later reached TP2/TP3 before
+the stop or the 48-hour deadline under a hold-through-TP1 rule. They are
+context, never part of expectancy.
 
 ---
 
@@ -209,6 +275,25 @@ points. That happens when price gapped past TP1 before the fill — the outcome
 is "TP1 hit first", but exiting at the group's TP level was worse than the fill.
 Marking it at TP rather than at the better open is deliberate and conservative.
 
+A trade is only settled once its path is complete — the stop was hit, or 48
+hours elapsed. A trade that has already touched TP1 but whose window has not
+closed stays unscored until the next run, because the TP2/TP3 excursion is
+still unfinished.
+
+### Reporting
+
+`dashboard.py` derives `report.html` from the three CSVs and computes nothing
+new about the market: every trade outcome and point total comes from
+`scored.csv` exactly as `score.py` settled it. It adds only presentation and
+arithmetic over those rows — percentages, cumulative sums, streak windows and
+the CHF conversions, which happen in the browser as you type.
+
+The `tp2_hit` / `tp3_hit` columns it reports are counterfactual, as above: the
+scored trade exits at TP1, so they record only whether price reached the later
+level before the stop or the deadline under a hold-through-TP1 rule. Treat them
+as a note on what a runner *might* have caught, never as evidence about the
+expectancy actually measured.
+
 ---
 
 ## Known limitations
@@ -254,6 +339,19 @@ across channels before comparing their track records.
 
 **Symbol coverage is gold only.** The price layer prices `GC=F`. Non-gold calls
 are captured and parsed but not scored.
+
+**The report's CHF figures are a projection, not a forecast.** The calculator
+multiplies a measured average by a rate you type in. Below 50 trades that
+average is barely distinguishable from noise, and the page says so on the row;
+above it, the projection still assumes the next 50 trades resemble the last n.
+The 10-trade streak figures are the shape of a normal bad run, not a worst case
+— a real losing run can be longer than ten.
+
+**Actions minutes.** Two jobs every 20 minutes is ~72 runs a day. On a public
+repository that is free and unmetered, which is the same condition Pages
+imposes on the free tier. On a private repository it would exhaust the monthly
+allowance in days — lengthen the cron or drop the `report` job if you go
+private.
 
 **This measures signals, not subscriber outcomes.** Position sizing, execution
 delay, spread, and swap are all outside the model. A positive expectancy here

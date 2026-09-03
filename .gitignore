@@ -8,3 +8,6 @@ venv/
 *.session
 *.session-journal
 .env
+
+# Pages build directory, assembled in CI
+_site/

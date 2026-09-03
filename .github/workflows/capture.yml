@@ -7,24 +7,27 @@ on:
     - cron: "*/20 * * * *"
   workflow_dispatch:
     inputs:
-      run_analysis:
-        description: "Also run parse.py and score.py after capturing"
-        type: boolean
-        default: false
+      position_size_chf:
+        description: "Pre-fill the report's position size calculator (CHF per trade)"
+        type: string
+        default: "100"
 
-# One capture at a time. Queued, never cancelled: a cancelled run is a lost
-# capture window, and the whole point is that the record has no holes.
+# One run at a time, and the report job pushes too. Queued, never cancelled:
+# a cancelled run is a lost capture window, and the whole point is that the
+# record has no holes.
 concurrency:
   group: signal-capture-${{ github.ref }}
   cancel-in-progress: false
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   capture:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout
@@ -50,19 +53,22 @@ jobs:
           TG_SESSION: ${{ secrets.TG_SESSION }}
         run: python capture.py
 
-      - name: Parse and score
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_analysis }}
-        run: |
-          python parse.py
-          python score.py
-
-      - name: Commit and push changed CSVs
+      - name: Commit and push captured CSVs
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          git add -A -- '*.csv'
+          targets=""
+          for f in *.csv; do
+            if [ -e "$f" ]; then targets="$targets $f"; fi
+          done
+          if [ -z "$targets" ]; then
+            echo "No CSVs on disk yet; nothing to commit."
+            exit 0
+          fi
+
+          git add -A -- $targets
           if git diff --cached --quiet; then
             echo "No CSV changes to commit."
             exit 0
@@ -86,3 +92,102 @@ jobs:
 
           echo "::error::Could not push captured data after 4 attempts."
           exit 1
+
+  report:
+    needs: capture
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write   # commit report.html
+      pages: write      # deploy to GitHub Pages
+      id-token: write   # OIDC token the Pages deployment needs
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # The branch tip, NOT github.sha: the capture job just pushed new
+          # rows and this job has to see them.
+          ref: ${{ github.ref_name }}
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas yfinance
+
+      # parse.py first: score.py reads signals.csv, so without this step the
+      # messages the capture job just landed would never become signals.
+      - name: Parse, score and render
+        env:
+          POSITION_SIZE_CHF: ${{ inputs.position_size_chf || '100' }}
+        run: |
+          python parse.py
+          python score.py
+          python dashboard.py
+
+      - name: Commit and push report
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          targets=""
+          for f in *.csv report.html; do
+            if [ -e "$f" ]; then targets="$targets $f"; fi
+          done
+          if [ -z "$targets" ]; then
+            echo "Nothing on disk to commit."
+            exit 0
+          fi
+
+          git add -A -- $targets
+          if git diff --cached --quiet; then
+            echo "No report changes to commit."
+          else
+            git commit -m "report: $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+            branch="${GITHUB_REF_NAME}"
+            delay=2
+            for attempt in 1 2 3 4; do
+              git pull --rebase origin "$branch" || true
+              if git push -u origin "HEAD:$branch"; then
+                echo "Pushed on attempt $attempt."
+                break
+              fi
+              if [ "$attempt" = "4" ]; then
+                echo "::error::Could not push the report after 4 attempts."
+                exit 1
+              fi
+              echo "Push attempt $attempt failed; retrying in ${delay}s."
+              sleep "$delay"
+              delay=$((delay * 2))
+            done
+          fi
+
+      - name: Assemble Pages site
+        run: |
+          set -euo pipefail
+          mkdir -p _site
+          cp report.html _site/report.html
+          # Pages serves index.html at the root, so the bare URL works too.
+          cp report.html _site/index.html
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Deploy to GitHub Pages
+        id: deploy
+        uses: actions/deploy-pages@v4
