@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Telethon writes *.session files when a session is not passed as a string.
+# These are login credentials. They must never reach the repository.
+*.session
+*.session-journal
+.env
