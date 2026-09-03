@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Telegram Signal Audit — Report</title>
+<style>
+:root {
+  --surface: #ffffff;
+  --plane: #f9f9f7;
+  --ink: #0b0b0b;
+  --ink-2: #52514e;
+  --muted: #898781;
+  --rule: #e1e0d9;
+  --axis: #c3c2b7;
+  --crit: #d03b3b;
+  --good: #006300;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--surface);
+  color: var(--ink);
+  font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+.wrap { max-width: 980px; margin: 0 auto; padding: 24px 16px 72px; }
+h1 { font-size: 25px; line-height: 1.2; margin: 0 0 6px; }
+h2 {
+  font-size: 19px; margin: 44px 0 4px; padding-top: 22px;
+  border-top: 1px solid var(--rule);
+}
+h2 .num { color: var(--muted); font-weight: 600; margin-right: 8px; }
+p { margin: 8px 0; }
+.lede { color: var(--ink-2); margin: 0 0 4px; }
+.note { color: var(--ink-2); font-size: 14px; }
+.muted { color: var(--muted); }
+small { font-size: 13px; }
+code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; }
+
+.scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 14px 0 6px; }
+table { border-collapse: collapse; width: 100%; font-size: 15px;
+        font-variant-numeric: tabular-nums; }
+th, td { padding: 12px 10px; text-align: right; border-bottom: 1px solid var(--rule);
+         white-space: nowrap; vertical-align: top; }
+th:first-child, td:first-child { text-align: left; }
+thead th { font-size: 13px; color: var(--ink-2); font-weight: 600;
+           border-bottom: 1.5px solid var(--axis); }
+tbody tr:last-child td { border-bottom: none; }
+td .sub { display: block; font-size: 12px; color: var(--muted); font-weight: 400; }
+td .sub.neg { color: var(--crit); }
+.chan { font-weight: 600; }
+.dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%;
+       margin-right: 7px; vertical-align: -1px; }
+.neg { color: var(--crit); }
+.pos { color: var(--good); }
+.badge {
+  display: inline-block; margin-top: 4px; padding: 2px 7px; border-radius: 4px;
+  background: var(--plane); border: 1px solid var(--rule);
+  font-size: 11px; font-weight: 600; color: var(--ink-2); letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+.badge.warn { border-color: var(--crit); color: var(--crit); }
+
+.controls { display: flex; flex-wrap: wrap; gap: 16px; margin: 16px 0 4px; }
+.field { flex: 1 1 220px; min-width: 180px; }
+label { display: block; font-size: 14px; color: var(--ink-2); margin-bottom: 6px; }
+input[type="number"] {
+  width: 100%; min-height: 44px; padding: 10px 12px;
+  font: 16px/1.4 system-ui, -apple-system, sans-serif;
+  color: var(--ink); background: var(--surface);
+  border: 1px solid var(--axis); border-radius: 8px;
+}
+input[type="number"]:focus { outline: 2px solid #2a78d6; outline-offset: 1px; }
+
+.chartbox { margin: 16px 0 0; }
+svg.equity { display: block; width: 100%; min-width: 600px; height: auto; }
+svg.equity .tick { font: 12px system-ui, sans-serif; fill: var(--muted);
+                   font-variant-numeric: tabular-nums; }
+svg.equity .endlabel { font: 12px system-ui, sans-serif; fill: var(--ink-2); }
+svg.equity .endlabel.neg { fill: var(--crit); font-weight: 600; }
+.readout {
+  margin: 10px 0 0; padding: 12px 14px; min-height: 44px;
+  background: var(--plane); border: 1px solid var(--rule); border-radius: 8px;
+  font-size: 15px; font-variant-numeric: tabular-nums;
+}
+.legend { display: flex; flex-wrap: wrap; gap: 10px 20px; margin: 14px 0 0;
+          padding: 0; list-style: none; }
+.legend li { font-size: 14px; color: var(--ink-2); min-height: 24px; }
+.legend .name { color: var(--ink); font-weight: 600; }
+
+.banner {
+  margin: 20px 0; padding: 18px; border-radius: 10px;
+  background: var(--plane); border: 1px solid var(--rule);
+}
+.banner strong { display: block; font-size: 18px; margin-bottom: 6px; }
+.rules { padding-left: 22px; margin: 10px 0; }
+.rules li { margin: 6px 0; color: var(--ink-2); }
+.evtext { white-space: normal; max-width: 340px; text-align: left;
+          font-size: 14px; color: var(--ink-2); }
+footer { margin-top: 48px; padding-top: 20px; border-top: 1px solid var(--rule);
+         color: var(--muted); font-size: 13px; }
+@media (max-width: 420px) {
+  .wrap { padding: 18px 12px 56px; }
+  h1 { font-size: 22px; }
+  th, td { padding: 12px 8px; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>Telegram Signal Audit</h1>
+<p class="lede">Generated 2026-09-03 17:31 UTC · 6 channel(s) ·
+0 parsed signal(s) · 0 settled trade(s) ·
+0 deletion(s) · 108 edit(s)</p>
+<p class="note">Net of 3 points of round-trip costs. TP1 and SL inside the same
+5-minute candle is scored as a loss. Maximum holding period 48 hours.</p>
+<div class="banner"><strong>No scored signals yet — check back after the first scoring run</strong><span class="note">The summary table, the position size calculator and the equity curve appear here once score.py has settled its first trade. Capture keeps running in the meantime, so the evidence log below may already have something in it.</span></div><h2><span class="num">4</span>Deletion and edit log</h2><p class="lede">0 deletion(s) and 108 edit(s) detected. 0 of the deleted messages had been scored; 0 of those were not wins. Every row here is a message the channel changed or removed after posting. Original text is always the first version captured.</p><div class="scroll"><table><thead><tr><th>Channel</th><th>Message ID</th><th>Original Timestamp</th><th>Deletion/Edit Time</th><th>Time Gap</th><th>Original Text</th></tr></thead><tbody><tr><td>@fxtradingvision</td><td>84315</td><td>2026-09-03T14:38:43Z</td><td>2026-09-03T14:38:45Z<span class="sub muted">edited</span></td><td>2s</td><td class="evtext">GYM TIME BABY.</td></tr><tr><td>@fxtradingvision</td><td>84314</td><td>2026-09-03T14:22:27Z</td><td>2026-09-03T14:22:28Z<span class="sub muted">edited</span></td><td>1s</td><td class="evtext">TP 2 is hit aswell + 340 pips profit</td></tr><tr><td>@fxtradingvision</td><td>84313</td><td>2026-09-03T13:59:44Z</td><td>2026-09-03T13:59:45Z<span class="sub muted">edited</span></td><td>1s</td><td class="evtext">TP 1 &amp; 2 are BOTH hit ✅ + 90 pips profit secured as we used double lotsize 🔥🔥🔥 …</td></tr><tr><td>@fxtradingvision</td><td>84312</td><td>2026-09-03T13:59:18Z</td><td>2026-09-03T13:59:19Z<span class="sub muted">edited</span></td><td>1s</td><td class="evtext">LIVE FREE GOLD TRADE</td></tr><tr><td>@fxtradingvision</td><td>84311</td><td>2026-09-03T13:46:48Z</td><td>2026-09-03T13:46:51Z<span class="sub muted">edited</span></td><td>3s</td><td class="evtext">NEW TRADE IDEA XAUUSD BUY 4464 TP 1 4468 TP 2 4469 TP 3 4500 SL @ 4440 Trade ac…</td></tr><tr><td>@fxtradingvision</td><td>84310</td><td>2026-09-03T13:46:06Z</td><td>2026-09-03T13:46:06Z<span class="sub muted">edited</span></td><td>0s</td><td class="evtext">OPEN GOLD BUYS.</td></tr><tr><td>@fxtradingvision</td><td>84309</td><td>2026-09-03T13:19:32Z</td><td>2026-09-03T13:19:33Z<span class="sub muted">edited</span></td><td>1s</td><td class="evtext">Thank you, brother Mike. You are the king of gold, brother! 👑🏆</td></tr><tr><td>@fxtradingvision</td><td>84246</td><td>2026-09-03T08:46:01Z</td><td>2026-09-03T13:17:29Z<span class="sub muted">edited</span></td><td>4h 31m</td><td class="evtext">Piter made €4,725 profit by copying my trades in the VIP ✅ Simple copy &amp; paste.…</td></tr><tr><td>@fxtradingvision</td><td>84308</td><td>2026-09-03T13:17:24Z</td><td>2026-09-03T13:17:25Z<span class="sub muted">edited</span></td><td>1s</td><td class="evtext">New trade on GOLD shared in the VIP ☕️ Which direction? Buy or Sell? 👉 CLICK HE…</td></tr><tr><td>@fxtradingvision</td><td>84307</td><td>2026-09-03T13:08:38Z</td><td>2026-09-03T13:08:46Z<span class="sub muted">edited</span></td><td>8s</td><td class="evtext">I AM SELFMADE! GOT 330,000 FOLLOWERS. THAT’S FOR A REASON. THE BEST IN THE GAME.</td></tr><tr><td>@fxtradingvision</td><td>84304</td><td>2026-09-03T13:04:20Z</td><td>2026-09-03T13:04:20Z<span class="sub muted">edited</span></td><td>0s</td><td class="evtext">Day 2 inside the group and I’m already at 3x</td></tr><tr><td>@fxtradingvision</td><td>84305</td><td>2026-09-03T13:04:20Z</td><td>2026-09-03T13:04:20Z<span class="sub muted">edited</span></td><td>0s</td><td class="evtext">Wizard Mike! 🧙🧙</td></tr><tr><td>@fxtradingvision</td><td>84306</td><td>2026-09-03T13:04:20Z</td><td>2026-09-03T13:04:20Z<span class="sub muted">edited</span></td><td>0s</td><td class="evtext">Mike we salute you for your hard work that you and your team putting to make al…</td></tr><tr><td>@fxtradingvision</td><td>84303</td><td>2026-09-03T13:02:53Z</td><td>2026-09-03T13:02:53Z<span class="sub muted">edited</span></td><td>0s</td><td class="evtext">Everyone who is not in the 10X Challenge is missing so much</td></tr><tr><td>@fxtradingvision</td><td>84300</td><td>2026-09-03T12:57:49Z</td><td>2026-09-03T12:57:50Z<span class="sub muted">edited</span></td><td>1s</td><td class="evtext">#Mikethegoat</td></tr><tr><td>@fxtradingvision</td><td>84301</td><td>2026-09-03T12:57:49Z</td><td>2026-09-03T12:57:50Z<span class="sub muted">edited</span></td><td>1s</td><td class="evtext">The goat. So good 🚀🚀</td></tr><tr><td>@fxtradingvision</td><td>84302</td><td>2026-09-03T12:57:49Z</td><td>2026-09-03T12:57:50Z<span class="sub muted">edited</span></td><td>1s</td><td class="evtext">Mike what is this😂 the money is flooding❤️❤️</td></tr><tr><td>@fxtradingvision</td><td>84299</td><td>2026-09-03T12:55:31Z</td><td>2026-09-03T12:55:31Z<span class="sub muted">edited</span></td><td>0s</td><td class="evtext">TP 1 is hit! 👏 + 90 pips profit secured. SL back to entry.</td></tr><tr><td>@fxtradingvision</td><td>84297</td><td>2026-09-03T12:42:20Z</td><td>2026-09-03T12:42:21Z<span class="sub muted">edited</span></td><td>1s</td><td class="evtext"></td></tr><tr><td>@fxtradingvision</td><td>84296</td><td>2026-09-03T12:37:52Z</td><td>2026-09-03T12:37:53Z<span class="sub muted">edited</span></td><td>1s</td><td class="evtext">Our goal was X10 but people going for X100 with the challenge.</td></tr><tr><td>@fxtradingvision</td><td>84295</td><td>2026-09-03T12:37:26Z</td><td>2026-09-03T12:37:26Z<span class="sub muted">edited</span></td><td>0s</td><td class="evtext">X44! 🤩</td></tr><tr><td>@fxtradingvision</td><td>84294</td><td>2026-09-03T12:33:10Z</td><td>2026-09-03T12:33:11Z<span class="sub muted">edited</span></td><td>1s</td><td class="evtext">Locked in at the office.</td></tr><tr><td>@fxtradingvision</td><td>84293</td><td>2026-09-03T12:31:50Z</td><td>2026-09-03T12:31:51Z<span class="sub muted">edited</span></td><td>1s</td><td class="evtext">TP 2 is hit on double lotsize + 560 pips profit secured That’s the BIG jackpot …</td></tr><tr><td>@fxtradingvision</td><td>84292</td><td>2026-09-03T12:22:58Z</td><td>2026-09-03T12:22:59Z<span class="sub muted">edited</span></td><td>1s</td><td class="evtext"></td></tr><tr><td>@fxtradingvision</td><td>84291</td><td>2026-09-03T12:22:53Z</td><td>2026-09-03T12:22:53Z<span class="sub muted">edited</span></td><td>0s</td><td class="evtext">TP 1 &amp; 2 are BOTH hit ✅ + 90 pips profit secured as we used double lotsize 🔥🔥🔥 …</td></tr><tr><td>@fxtradingvision</td><td>84290</td><td>2026-09-03T12:21:47Z</td><td>2026-09-03T12:21:47Z<span class="sub muted">edited</span></td><td>0s</td><td class="evtext">NEW TRADE IDEA XAUUSD BUY 4438 TP 1 4442 TP 2 4443 TP 3 4470 SL @ 4415 Trade ac…</td></tr><tr><td>@fxtradingvision</td><td>84289</td><td>2026-09-03T12:21:13Z</td><td>2026-09-03T12:21:14Z<span class="sub muted">edited</span></td><td>1s</td><td class="evtext">OPEN NEW GOLD BUYS</td></tr><tr><td>@fxtradingvision</td><td>84288</td><td>2026-09-03T12:20:59Z</td><td>2026-09-03T12:21:01Z<span class="sub muted">edited</span></td><td>2s</td><td class="evtext">DO YOU WANT A NEW VIP GOLD TRADE?</td></tr><tr><td>@fxtradingvision</td><td>84287</td><td>2026-09-03T12:08:05Z</td><td>2026-09-03T12:08:05Z<span class="sub muted">edited</span></td><td>0s</td><td class="evtext">Yes mate. Just reached X10! A huge thank you to you and your team. From $2K to …</td></tr><tr><td>@fxtradingvision</td><td>84286</td><td>2026-09-03T12:07:46Z</td><td>2026-09-03T12:07:47Z<span class="sub muted">edited</span></td><td>1s</td><td class="evtext"></td></tr><tr><td>@fxtradingvision</td><td>84285</td><td>2026-09-03T11:58:56Z</td><td>2026-09-03T11:58:57Z<span class="sub muted">edited</span></td><td>1s</td><td class="evtext">TP 2 is hit! 👏 + 280 pips profit secured.</td></tr><tr><td>@fxtradingvision</td><td>84284</td><td>2026-09-03T11:51:18Z</td><td>2026-09-03T11:51:21Z<span class="sub muted">edited</span></td><td>3s</td><td class="evtext">WANT TO JOIN THE X10 CHALLENGE? Follow the instructions below to UNLOCK your ac…</td></tr><tr><td>@fxtradingvision</td><td>84283</td><td>2026-09-03T11:47:49Z</td><td>2026-09-03T11:47:50Z<span class="sub muted">edited</span></td><td>1s</td><td class="evtext">X10 CHALLENGE IS BEING EXTENDED BY ONE WEEK! 👏 END DATE NORMALLY 4 SEPTEMBER NE…</td></tr><tr><td>@fxtradingvision</td><td>84281</td><td>2026-09-03T11:45:54Z</td><td>2026-09-03T11:45:54Z<span class="sub muted">edited</span></td><td>0s</td><td class="evtext">TP 1 &amp; 2 are BOTH hit ✅ + 90 pips profit secured as we used double lotsize 🔥🔥🔥 …</td></tr><tr><td>@fxtradingvision</td><td>84278</td><td>2026-09-03T11:37:08Z</td><td>2026-09-03T11:37:09Z<span class="sub muted">edited</span></td><td>1s</td><td class="evtext">NEW TRADE IDEA XAUUSD BUY 4435 TP 1 4439 TP 2 4440 TP 3 4475 SL @ 4410 Trade ac…</td></tr><tr><td>@fxtradingvision</td><td>84277</td><td>2026-09-03T11:36:47Z</td><td>2026-09-03T11:36:48Z<span class="sub muted">edited</span></td><td>1s</td><td class="evtext">OPEN GOLD BUYS</td></tr><tr><td>@fxtradingvision</td><td>84276</td><td>2026-09-03T11:29:21Z</td><td>2026-09-03T11:29:21Z<span class="sub muted">edited</span></td><td>0s</td><td class="evtext">SHOW ME THE LIKES</td></tr><tr><td>@fxtradingvision</td><td>84275</td><td>2026-09-03T11:29:19Z</td><td>2026-09-03T11:29:20Z<span class="sub muted">edited</span></td><td>1s</td><td class="evtext">DO YOU WANT A NEW VIP GOLD TRADE?</td></tr><tr><td>@fxtradingvision</td><td>84273</td><td>2026-09-03T11:19:34Z</td><td>2026-09-03T11:19:34Z<span class="sub muted">edited</span></td><td>0s</td><td class="evtext">TP 2 is hit on double lotsize + 220 pips profit</td></tr><tr><td>@fxtradingvision</td><td>84274</td><td>2026-09-03T11:19:34Z</td><td>2026-09-03T11:19:34Z<span class="sub muted">edited</span></td><td>0s</td><td class="evtext">TP 2 is hit on double lotsize + 260 pips profit</td></tr><tr><td>@fxtradingvision</td><td>84272</td><td>2026-09-03T11:09:19Z</td><td>2026-09-03T11:09:20Z<span class="sub muted">edited</span></td><td>1s</td><td class="evtext">TP 1 is hit! 👏 + 80 pips profit secured. SL back to entry.</td></tr><tr><td>@fxtradingvision</td><td>84271</td><td>2026-09-03T11:06:04Z</td><td>2026-09-03T11:06:05Z<span class="sub muted">edited</span></td><td>1s</td><td class="evtext">It’s very simple to join… takes 5 minutes All you have to do is to follow the s…</td></tr><tr><td>@fxtradingvision</td><td>84270</td><td>2026-09-03T10:54:05Z</td><td>2026-09-03T10:54:06Z<span class="sub muted">edited</span></td><td>1s</td><td class="evtext">We shared 8 trades today and won all 8 of them. What a streak…….</td></tr><tr><td>@fxtradingvision</td><td>84269</td><td>2026-09-03T10:53:52Z</td><td>2026-09-03T10:53:52Z<span class="sub muted">edited</span></td><td>0s</td><td class="evtext">HIT AFTER HIT INSIDE THE CHALLENGE.</td></tr><tr><td>@fxtradingvision</td><td>84268</td><td>2026-09-03T10:53:32Z</td><td>2026-09-03T10:53:33Z<span class="sub muted">edited</span></td><td>1s</td><td class="evtext">TP 1 is hit! 👏 + 80 pips profit secured. SL back to entry.</td></tr><tr><td>@fxtradingvision</td><td>84267</td><td>2026-09-03T10:44:29Z</td><td>2026-09-03T10:44:31Z<span class="sub muted">edited</span></td><td>2s</td><td class="evtext">WANT TO JOIN THE X10 CHALLENGE? Follow the instructions below to UNLOCK your ac…</td></tr><tr><td>@fxtradingvision</td><td>84266</td><td>2026-09-03T10:42:04Z</td><td>2026-09-03T10:42:04Z<span class="sub muted">edited</span></td><td>0s</td><td class="evtext">TP 1 is hit! 👏 + 80 pips profit secured. SL back to entry.</td></tr><tr><td>@fxtradingvision</td><td>84257</td><td>2026-09-03T10:08:29Z</td><td>2026-09-03T10:08:31Z<span class="sub muted">edited</span></td><td>2s</td><td class="evtext">TP 1 &amp; 2 are BOTH hit ✅ + 90 pips profit secured as we used double lotsize 🔥🔥🔥 …</td></tr><tr><td>@fxtradingvision</td><td>84256</td><td>2026-09-03T10:00:00Z</td><td>2026-09-03T10:00:01Z<span class="sub muted">edited</span></td><td>1s</td><td class="evtext">LIVE FREE GOLD TRADE SHOW ME THE LIKES</td></tr><tr><td>@fxtradingvision</td><td>84255</td><td>2026-09-03T09:57:09Z</td><td>2026-09-03T09:57:10Z<span class="sub muted">edited</span></td><td>1s</td><td class="evtext">NEW TRADE IDEA XAUUSD BUY 4425 TP 1 4429 TP 2 4430 TP 3 4475 SL @ 4400 Trade ac…</td></tr><tr><td>@fxtradingvision</td><td>84254</td><td>2026-09-03T09:56:50Z</td><td>2026-09-03T09:56:51Z<span class="sub muted">edited</span></td><td>1s</td><td class="evtext">OPEN GOLD BUYS</td></tr><tr><td>@fxtradingvision</td><td>84253</td><td>2026-09-03T09:19:57Z</td><td>2026-09-03T09:19:57Z<span class="sub muted">edited</span></td><td>0s</td><td class="evtext">WANT TO JOIN THE X10 CHALLENGE? Follow the instructions below to UNLOCK your ac…</td></tr><tr><td>@fxtradingvision</td><td>84252</td><td>2026-09-03T09:15:59Z</td><td>2026-09-03T09:16:00Z<span class="sub muted">edited</span></td><td>1s</td><td class="evtext">NO DEMO ACCOUNTS OR FAKE RESULS ON THIS SIDE. I TOLD YOU THIS X10 CHALLENGE IS …</td></tr><tr><td>@fxtradingvision</td><td>84251</td><td>2026-09-03T09:09:17Z</td><td>2026-09-03T09:09:17Z<span class="sub muted">edited</span></td><td>0s</td><td class="evtext">Want to see his trades with the X10 challenge?</td></tr><tr><td>@fxtradingvision</td><td>84250</td><td>2026-09-03T08:58:56Z</td><td>2026-09-03T08:58:57Z<span class="sub muted">edited</span></td><td>1s</td><td class="evtext">TP 1 is hit! 👏 + 80 pips profit secured. SL back to entry.</td></tr><tr><td>@fxtradingvision</td><td>84249</td><td>2026-09-03T08:52:13Z</td><td>2026-09-03T08:52:13Z<span class="sub muted">edited</span></td><td>0s</td><td class="evtext">That is one of our X10 challenge members….. Simple as that….</td></tr><tr><td>@fxtradingvision</td><td>84248</td><td>2026-09-03T08:51:14Z</td><td>2026-09-03T08:51:14Z<span class="sub muted">edited</span></td><td>0s</td><td class="evtext">This must be the wildest thing that’s ever happened to me. Started on Monday wi…</td></tr><tr><td>@fxtradingvision</td><td>84245</td><td>2026-09-03T08:28:32Z</td><td>2026-09-03T08:28:33Z<span class="sub muted">edited</span></td><td>1s</td><td class="evtext">Today we aim to win all our trades and to lose maximum 1 trade.</td></tr><tr><td>@fxtradingvision</td><td>84244</td><td>2026-09-03T08:27:29Z</td><td>2026-09-03T08:27:30Z<span class="sub muted">edited</span></td><td>1s</td><td class="evtext">WANT TO JOIN THE X10 CHALLENGE? Follow the instructions below to UNLOCK your ac…</td></tr><tr><td>@fxtradingvision</td><td>84243</td><td>2026-09-03T08:27:16Z</td><td>2026-09-03T08:27:17Z<span class="sub muted">edited</span></td><td>1s</td><td class="evtext">Yesterday we shared 43 trades in the X10 challenge. We won 40 of them. Lost 3. …</td></tr><tr><td>@fxtradingvision</td><td>84230</td><td>2026-09-03T06:23:01Z</td><td>2026-09-03T08:22:28Z<span class="sub muted">edited</span></td><td>1h 59m</td><td class="evtext">✅ I have my eyes on another very high-potential GOLD trade that I’m going to ON…</td></tr><tr><td>@fxtradingvision</td><td>84241</td><td>2026-09-03T08:19:57Z</td><td>2026-09-03T08:19:57Z<span class="sub muted">edited</span></td><td>0s</td><td class="evtext">Nice one, legends.</td></tr><tr><td>@fxtradingvision</td><td>84240</td><td>2026-09-03T08:19:53Z</td><td>2026-09-03T08:19:54Z<span class="sub muted">edited</span></td><td>1s</td><td class="evtext">TP 1 &amp; 2 are BOTH hit ✅ + 90 pips profit secured as we used double lotsize 🔥🔥🔥 …</td></tr><tr><td>@fxtradingvision</td><td>84239</td><td>2026-09-03T08:11:14Z</td><td>2026-09-03T08:11:15Z<span class="sub muted">edited</span></td><td>1s</td><td class="evtext">NEW TRADE IDEA XAUUSD BUY 4434 TP 1 4438 TP 2 4439 TP 3 4480 SL @ 4310 Trade ac…</td></tr><tr><td>@fxtradingvision</td><td>84238</td><td>2026-09-03T08:10:36Z</td><td>2026-09-03T08:10:37Z<span class="sub muted">edited</span></td><td>1s</td><td class="evtext">OPEN GOLD BUYS</td></tr><tr><td>@fxtradingvision</td><td>84237</td><td>2026-09-03T08:08:11Z</td><td>2026-09-03T08:08:11Z<span class="sub muted">edited</span></td><td>0s</td><td class="evtext">DO YOU WANT A VIP GOLD TRADE?</td></tr><tr><td>@fxtradingvision</td><td>84236</td><td>2026-09-03T08:07:01Z</td><td>2026-09-03T08:07:01Z<span class="sub muted">edited</span></td><td>0s</td><td class="evtext"></td></tr><tr><td>@fxtradingvision</td><td>84235</td><td>2026-09-03T07:55:12Z</td><td>2026-09-03T07:55:13Z<span class="sub muted">edited</span></td><td>1s</td><td class="evtext">Lets kill it today lads 🫡 I want to see everyone in this group win Gooooooo</td></tr><tr><td>@fxtradingvision</td><td>84232</td><td>2026-09-03T07:29:01Z</td><td>2026-09-03T07:29:01Z<span class="sub muted">edited</span></td><td>0s</td><td class="evtext"></td></tr><tr><td>@fxtradingvision</td><td>84233</td><td>2026-09-03T07:29:01Z</td><td>2026-09-03T07:29:01Z<span class="sub muted">edited</span></td><td>0s</td><td class="evtext"></td></tr><tr><td>@fxtradingvision</td><td>84234</td><td>2026-09-03T07:29:01Z</td><td>2026-09-03T07:29:01Z<span class="sub muted">edited</span></td><td>0s</td><td class="evtext"></td></tr><tr><td>@fxtradingvision</td><td>84231</td><td>2026-09-03T06:48:01Z</td><td>2026-09-03T06:48:01Z<span class="sub muted">edited</span></td><td>0s</td><td class="evtext"></td></tr><tr><td>@fxtradingvision</td><td>84224</td><td>2026-09-03T03:14:01Z</td><td>2026-09-03T06:23:05Z<span class="sub muted">edited</span></td><td>3h 9m</td><td class="evtext">Hey, it’s Thursday again :) Joanna joined on another Thursday and made €3,109 w…</td></tr><tr><td>@fxtradingvision</td><td>84228</td><td>2026-09-03T06:18:01Z</td><td>2026-09-03T06:18:01Z<span class="sub muted">edited</span></td><td>0s</td><td class="evtext">Lebbai made €600+ in 1 single day….</td></tr><tr><td>@fxtradingvision</td><td>84229</td><td>2026-09-03T06:18:01Z</td><td>2026-09-03T06:18:01Z<span class="sub muted">edited</span></td><td>0s</td><td class="evtext">We out here SMASHING it with the gold trades 🤑🤑🤑</td></tr><tr><td>@fxtradingvision</td><td>84227</td><td>2026-09-03T06:17:01Z</td><td>2026-09-03T06:17:01Z<span class="sub muted">edited</span></td><td>0s</td><td class="evtext">Alhamdhulillah today Thank you Mike ❤️❤️❤️</td></tr><tr><td>@fxtradingvision</td><td>84226</td><td>2026-09-03T05:33:01Z</td><td>2026-09-03T05:33:01Z<span class="sub muted">edited</span></td><td>0s</td><td class="evtext">The next gold trade will be shared inside my VIP and X10 within 45 minutes. It …</td></tr><tr><td>@fxtradingvision</td><td>84225</td><td>2026-09-03T04:38:01Z</td><td>2026-09-03T04:38:01Z<span class="sub muted">edited</span></td><td>0s</td><td class="evtext"></td></tr><tr><td>@fxtradingvision</td><td>84219</td><td>2026-09-02T20:44:20Z</td><td>2026-09-03T03:14:05Z<span class="sub muted">edited</span></td><td>6h 29m</td><td class="evtext">Piter made €4,725 profit by copying my trades in the VIP ✅ Simple copy &amp; paste.…</td></tr><tr><td>@fxtradingvision</td><td>84223</td><td>2026-09-03T03:12:01Z</td><td>2026-09-03T03:12:01Z<span class="sub muted">edited</span></td><td>0s</td><td class="evtext">I started only on Thursday late afternoon and couldn&#x27;t even follow properly on …</td></tr><tr><td>@fxtradingvision</td><td>84222</td><td>2026-09-03T02:52:01Z</td><td>2026-09-03T02:52:01Z<span class="sub muted">edited</span></td><td>0s</td><td class="evtext">Good good morning legends ❤️ Hope you woke up fresh for this Thursday!</td></tr><tr><td>@fxtradingvision</td><td>84221</td><td>2026-09-03T02:34:38Z</td><td>2026-09-03T02:34:38Z<span class="sub muted">edited</span></td><td>0s</td><td class="evtext">TP 1 &amp; 2 are BOTH hit ✅ + 90 pips profit secured as we used double lotsize 🔥🔥🔥 …</td></tr><tr><td>@fxtradingvision</td><td>84218</td><td>2026-09-02T19:13:12Z</td><td>2026-09-02T19:13:13Z<span class="sub muted">edited</span></td><td>1s</td><td class="evtext">We all lost money in our lives, never feel alone or lost in life. Keep going, n…</td></tr><tr><td>@fxtradingvision</td><td>84217</td><td>2026-09-02T19:11:59Z</td><td>2026-09-02T19:12:01Z<span class="sub muted">edited</span></td><td>2s</td><td class="evtext">Guys… only trade with money you can afford to lose. With trading it’s never onl…</td></tr><tr><td>@fxtradingvision</td><td>84216</td><td>2026-09-02T18:57:01Z</td><td>2026-09-02T18:57:01Z<span class="sub muted">edited</span></td><td>0s</td><td class="evtext"></td></tr><tr><td>@fxtradingvision</td><td>84215</td><td>2026-09-02T16:49:29Z</td><td>2026-09-02T16:49:31Z<span class="sub muted">edited</span></td><td>2s</td><td class="evtext">WANT TO JOIN THE X10 CHALLENGE? Follow the instructions below to UNLOCK your ac…</td></tr><tr><td>@fxtradingvision</td><td>84214</td><td>2026-09-02T14:36:28Z</td><td>2026-09-02T14:36:31Z<span class="sub muted">edited</span></td><td>3s</td><td class="evtext">Move SL to 4360 and be ready for firework.</td></tr><tr><td>@fxtradingvision</td><td>84213</td><td>2026-09-02T14:18:58Z</td><td>2026-09-02T14:18:58Z<span class="sub muted">edited</span></td><td>0s</td><td class="evtext">Open extra gold buys here.</td></tr><tr><td>@fxtradingvision</td><td>84212</td><td>2026-09-02T14:09:23Z</td><td>2026-09-02T14:09:25Z<span class="sub muted">edited</span></td><td>2s</td><td class="evtext">NEW TRADE IDEA XAUUSD BUY 4394 TP 1 4398 TP 2 4399 TP 3 4430 SL @ 4370 Trade ac…</td></tr><tr><td>@fxtradingvision</td><td>84211</td><td>2026-09-02T14:09:07Z</td><td>2026-09-02T14:09:07Z<span class="sub muted">edited</span></td><td>0s</td><td class="evtext">OPEN GOLD BUYS</td></tr><tr><td>@fxtradingvision</td><td>84210</td><td>2026-09-02T13:58:44Z</td><td>2026-09-02T13:58:45Z<span class="sub muted">edited</span></td><td>1s</td><td class="evtext">Mike the goaaat</td></tr><tr><td>@fxtradingvision</td><td>84208</td><td>2026-09-02T13:54:41Z</td><td>2026-09-02T13:54:41Z<span class="sub muted">edited</span></td><td>0s</td><td class="evtext"></td></tr><tr><td>@fxtradingvision</td><td>84207</td><td>2026-09-02T13:49:32Z</td><td>2026-09-02T13:49:33Z<span class="sub muted">edited</span></td><td>1s</td><td class="evtext">TP 1 is hit! 👏 + 40 pips profit secured. SL back to entry.</td></tr><tr><td>@fxtradingvision</td><td>84206</td><td>2026-09-02T13:41:14Z</td><td>2026-09-02T13:41:15Z<span class="sub muted">edited</span></td><td>1s</td><td class="evtext">Follow the instructions below to UNLOCK your access directly! 👇 @FXTV10Xonboard…</td></tr><tr><td>@fxtradingvision</td><td>84205</td><td>2026-09-02T13:33:20Z</td><td>2026-09-02T13:33:20Z<span class="sub muted">edited</span></td><td>0s</td><td class="evtext">Baaaaaaaam 2493€ in plus 😵‍💫😵‍💫😵‍💫😵‍💫</td></tr><tr><td>@fxtradingvision</td><td>84204</td><td>2026-09-02T13:32:43Z</td><td>2026-09-02T13:32:43Z<span class="sub muted">edited</span></td><td>0s</td><td class="evtext">X10 CHALLENGE IS GOING INSANEEEE NOW</td></tr><tr><td>@wolfxsignals</td><td>234</td><td>2022-04-09T18:16:53Z</td><td>2025-05-28T08:02:12Z<span class="sub muted">edited</span></td><td>1144d 13h</td><td class="evtext">#Bitcoin has to break this RSI resistance. If we break it, a significant runup …</td></tr><tr><td>@wolfxsignals</td><td>273</td><td>2022-04-09T23:30:09Z</td><td>2025-05-22T16:10:08Z<span class="sub muted">edited</span></td><td>1138d 16h</td><td class="evtext">In the last twenty days, this whale accumulated more than 575 #BTC at an averag…</td></tr><tr><td>@wolfxsignals</td><td>270</td><td>2022-04-09T23:19:44Z</td><td>2025-04-11T06:11:14Z<span class="sub muted">edited</span></td><td>1097d 6h</td><td class="evtext">If you are joining us today feel free to join this investment program Join our …</td></tr><tr><td>@wolfxsignals</td><td>271</td><td>2022-04-09T23:26:01Z</td><td>2025-03-29T01:50:49Z<span class="sub muted">edited</span></td><td>1084d 2h</td><td class="evtext">😂😂</td></tr><tr><td>@wolfxsignals</td><td>272</td><td>2022-04-09T23:28:06Z</td><td>2022-09-30T03:34:13Z<span class="sub muted">edited</span></td><td>173d 4h</td><td class="evtext">Imagine if $CULT did a 100x from here I’m in the same boat as you, pure specula…</td></tr><tr><td>@wolfxsignals</td><td>274</td><td>2022-04-09T23:31:20Z</td><td>2022-07-01T11:55:36Z<span class="sub muted">edited</span></td><td>82d 12h</td><td class="evtext">#IMPORTANT: Wallets with 10 to 1000 $BTC are widely selling their coins! The wa…</td></tr><tr><td>@wolfxsignals</td><td>269</td><td>2022-04-09T23:16:39Z</td><td>2022-06-29T18:06:57Z<span class="sub muted">edited</span></td><td>80d 18h</td><td class="evtext">If $42.6k continues to hold as Resistance, the trend is for price to follow thi…</td></tr><tr><td>@wolfxsignals</td><td>276</td><td>2022-04-09T23:35:35Z</td><td>2022-05-29T19:02:39Z<span class="sub muted">edited</span></td><td>49d 19h</td><td class="evtext">#BTC : 11 year resistance will break!</td></tr><tr><td>@wolfxsignals</td><td>275</td><td>2022-04-09T23:32:19Z</td><td>2022-04-18T05:35:24Z<span class="sub muted">edited</span></td><td>8d 6h</td><td class="evtext">FOCUS ON THE LONG TERM! WE AT INVESTING AND ACCUMULATION PHASE! $BTC</td></tr><tr><td>@wolfxsignals</td><td>246</td><td>2022-04-09T18:32:00Z</td><td>2022-04-09T20:37:17Z<span class="sub muted">edited</span></td><td>2h 5m</td><td class="evtext">Would you rather get paid in #Bitcoin , #ETH or #USDT? #USDT $ETH $BTC 👇🏼 👇🏼 👇🏼…</td></tr><tr><td>@wolfxsignals</td><td>183</td><td>2022-04-08T23:18:13Z</td><td>2022-04-09T16:13:12Z<span class="sub muted">edited</span></td><td>16h 54m</td><td class="evtext">Flip your coin, get X3 returns on 1 ETH and X5 return on 1 BTC. trade scheduled…</td></tr><tr><td>@wolfxsignals</td><td>173</td><td>2022-04-08T21:38:31Z</td><td>2022-04-09T16:12:18Z<span class="sub muted">edited</span></td><td>18h 33m</td><td class="evtext">Hello,👋 We are introducing the CORNIX AUTOMATED SALARY SCHEME of the Year Depos…</td></tr></tbody></table></div><p class="note">This log can only show what was captured. A signal posted and deleted between two 20-minute polls leaves no trace at all, so these counts are a lower bound.</p>
+<footer>
+<p><strong>The rules this report obeys.</strong></p>
+<ul class="rules">
+<li>No verdict on a channel until it has 50 scored trades, however
+good the numbers look before then.</li>
+<li>Expectancy is always shown twice — as measured, and with the best two trades
+removed. If the second number collapses, the edge was two trades.</li>
+<li>Pre-registered stopping rule: if every channel tested comes out negative, the
+investigation closes. No adding one more group.</li>
+</ul>
+<p>Deletion counts are a lower bound: a signal posted and deleted inside one
+20-minute polling window is never captured. Full methodology and limitations are
+in the repository README.</p>
+</footer>
+</div>
+<script>window.__AUDIT__ = {"points":[],"series":[],"counts":[]};</script>
+<script>
+(function () {
+  var DATA = window.__AUDIT__ || { points: [], series: [] };
+
+  function chf(value) {
+    return (value < 0 ? "-" : "+") + Math.abs(value).toFixed(2) + " CHF";
+  }
+  function cls(value) { return value < 0 ? "neg" : "pos"; }
+
+  // ---- section 2: live position sizing -----------------------------------
+  var riskInput = document.getElementById("risk");
+  var rateInput = document.getElementById("rate");
+
+  function recalc() {
+    if (!riskInput || !rateInput) { return; }
+    var risk = parseFloat(riskInput.value);
+    var rate = parseFloat(rateInput.value);
+    if (!isFinite(risk) || risk < 0) { risk = 0; }
+    if (!isFinite(rate) || rate < 0) { rate = 0; }
+
+    var rows = document.querySelectorAll("#calcbody tr[data-calc]");
+    for (var i = 0; i < rows.length; i++) {
+      var row = rows[i];
+      var d;
+      try { d = JSON.parse(row.getAttribute("data-calc")); } catch (e) { continue; }
+
+      var per = d.exp * rate;
+      var total = per * 50;
+      var staked = risk * 50;
+      var worstTheory = d.avgLoss * 10 * rate;
+      var bestTheory = d.avgWin * 10 * rate;
+
+      // Risk-based view: what the same expectancy is worth if the position is
+      // sized off the risk budget instead of the fixed rate.
+      var riskBased = d.sl > 0 ? (d.exp / d.sl) * risk : 0;
+      set(
+        row, ".c-per", chf(per), per,
+        d.sl > 0 ? "risk-based " + chf(riskBased) : ""
+      );
+      set(row, ".c-total", chf(total), total);
+      set(
+        row, ".c-pct",
+        staked > 0 ? (total / staked * 100).toFixed(1) + "%" : "\u2014",
+        total
+      );
+      set(
+        row, ".c-worst", chf(worstTheory), worstTheory,
+        "observed " + chf(d.worst * rate)
+      );
+      set(
+        row, ".c-best", chf(bestTheory), bestTheory,
+        "observed " + chf(d.best * rate)
+      );
+      var implied = d.sl > 0 && risk > 0 ? risk / d.sl : 0;
+      var mismatch =
+        implied > 0 && rate > 0 && (implied / rate > 3 || rate / implied > 3);
+      var factor = "";
+      if (mismatch) {
+        factor = implied > rate
+          ? " \u00b7 " + Math.round(implied / rate) + "\u00d7 the rate above"
+          : " \u00b7 1/" + Math.round(rate / implied) + " of the rate above";
+      }
+      set(
+        row, ".c-implied",
+        implied > 0 ? implied.toFixed(3) : "\u2014", 0,
+        d.sl > 0 ? "stop " + d.sl.toFixed(1) + " pts" + factor : "",
+        mismatch ? "neg" : ""
+      );
+    }
+  }
+
+  function set(row, selector, text, value, sub, subClass) {
+    var cell = row.querySelector(selector);
+    if (!cell) { return; }
+    cell.textContent = text;
+    cell.className = selector.slice(1) + (value ? " " + cls(value) : "");
+    if (sub) {
+      var span = document.createElement("span");
+      span.className = "sub" + (subClass ? " " + subClass : "");
+      span.textContent = sub;
+      cell.appendChild(span);
+    }
+  }
+
+  if (riskInput && rateInput) {
+    riskInput.addEventListener("input", recalc);
+    rateInput.addEventListener("input", recalc);
+    recalc();
+  }
+
+  // ---- section 3: tap-to-read on the equity curve -------------------------
+  // Click, not hover: on a tablet there is no hover, and every value here is
+  // also in the tables, so the readout enhances rather than gates.
+  var svg = document.querySelector("svg.equity");
+  var readout = document.getElementById("readout");
+  var cursor = document.getElementById("cursor");
+
+  if (svg && readout && DATA.points.length) {
+    svg.addEventListener("click", function (event) {
+      var pt = toLocal(event);
+      if (!pt) { return; }
+      var best = null, bestDistance = Infinity;
+      for (var i = 0; i < DATA.points.length; i++) {
+        var p = DATA.points[i];
+        var dx = p.x - pt.x, dy = p.y - pt.y;
+        var distance = dx * dx + dy * dy;
+        if (distance < bestDistance) { bestDistance = distance; best = p; }
+      }
+      if (!best) { return; }
+      var name = DATA.series[best.s] || "";
+      readout.textContent =
+        name + " \u00b7 trade " + best.i + " of " + DATA.counts[best.s] +
+        " \u00b7 " + best.t + " UTC \u00b7 message #" + best.id +
+        " \u00b7 " + best.out + " " +
+        (best.net >= 0 ? "+" : "-") + Math.abs(best.net).toFixed(2) +
+        " pts \u00b7 running total " +
+        (best.cum >= 0 ? "+" : "-") + Math.abs(best.cum).toFixed(2) + " pts";
+      if (cursor) {
+        cursor.setAttribute("cx", best.x);
+        cursor.setAttribute("cy", best.y);
+        cursor.setAttribute("opacity", "1");
+      }
+    });
+  }
+
+  function toLocal(event) {
+    if (!svg.getScreenCTM) { return null; }
+    var ctm = svg.getScreenCTM();
+    if (!ctm) { return null; }
+    var point = svg.createSVGPoint();
+    point.x = event.clientX;
+    point.y = event.clientY;
+    return point.matrixTransform(ctm.inverse());
+  }
+})();
+</script>
+</body>
+</html>
