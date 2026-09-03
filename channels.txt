@@ -1,13 +1,9 @@
-# Telegram channels to audit -- one @username per line.
-# Blank lines and anything after a '#' are ignored.
-#
-# The account behind TG_SESSION must already be a member of every channel
-# listed here; capture.py does not join anything.
-#
-# Add a channel the day you start paying for it, not later. Backfilling is
-# limited to the last 100 messages, and anything the group deleted before
-# the first capture is gone for good.
-#
-# Examples (uncomment and replace):
-# @some_gold_signals
-# @another_signals_vip
+# One @username per line. Get each from the channel profile in Telegram.
+@wolfxsignals
+@taurustraders
+@fxfaro
+@fxtradingvision
+@fxculture
+@forexmanfx
+@s2tbylennart
+@phenexbillions
