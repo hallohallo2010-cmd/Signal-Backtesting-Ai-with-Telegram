@@ -836,3 +836,14 @@ SL @ 4335
 Trade accordingly and only trade with money you can afford to LOSE.
 
 USE HIGH LOT if it touches 4354",1.0
+@fxtradingvision,85463,2026-09-16T15:51:06Z,LONG,XAUUSD,4330.0,4354.0,4355.0,4380.0,4330.0,"NEW TRADE IDEA
+
+XAUUSD BUY 4350
+
+TP 1 4354
+TP 2 4355
+TP 3 4380
+
+SL @ 4330
+
+Trade accordingly and only trade with money you can afford to LOSE.",1.0
