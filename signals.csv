@@ -799,3 +799,40 @@ TP 3 4320
 SL @ 4275
 
 Trade accordingly and only trade with money you can afford to LOSE.",1.0
+@fxtradingvision,85393,2026-09-16T08:10:18Z,LONG,XAUUSD,4300.0,4328.0,4329.0,4350.0,4300.0,"NEW TRADE IDEA
+
+XAUUSD BUY 4324
+
+TP 1 4328
+TP 2 4329
+TP 3 4350
+
+SL @ 4300
+
+Trade accordingly and only trade with money you can afford to LOSE.",1.0
+@fxtradingvision,85401,2026-09-16T09:49:43Z,LONG,XAUUSD,4315.0,4345.0,4346.0,4370.0,4341.0,"NEW TRADE IDEA
+
+XAUUSD BUY STOP 4341
+
+TP 1 4345
+TP 2 4346
+TP 3 4370
+
+SL @ 4315
+
+Trade accordingly and only trade with money you can afford to LOSE.
+
+WAIT FOR 4341 TO ENTER & USE HIGH LOT.",1.0
+@fxtradingvision,85410,2026-09-16T12:10:47Z,LONG,XAUUSD,4335.0,4358.0,4359.0,4390.0,4354.0,"NEW TRADE IDEA
+
+XAUUSD BUY STOP 4354
+
+TP 1 4358
+TP 2 4359
+TP 3 4390
+
+SL @ 4335
+
+Trade accordingly and only trade with money you can afford to LOSE.
+
+USE HIGH LOT if it touches 4354",1.0
