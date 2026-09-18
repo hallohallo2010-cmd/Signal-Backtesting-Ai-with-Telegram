@@ -12,6 +12,7 @@ never printed, logged, or written to disk.
 
 import csv
 import os
+import re
 import sys
 import time
 from datetime import datetime, timezone
@@ -20,6 +21,7 @@ from pathlib import Path
 from telethon.sync import TelegramClient
 from telethon.sessions import StringSession
 from telethon.errors import FloodWaitError
+from telethon.tl.types import Channel
 
 CHANNELS_FILE = Path(os.environ.get("CHANNELS_FILE", "channels.txt"))
 RAW_CSV = Path(os.environ.get("RAW_CSV", "raw_messages.csv"))
@@ -61,14 +63,33 @@ def normalize_text(text: str) -> str:
 
 
 def read_channels(path: Path):
+    """Return (target, label) pairs.
+
+    A line is either an @username or a numeric channel id, optionally followed
+    by =label. The target is what Telegram resolves; the label is what lands in
+    the channel column. They are separate because a username can silently start
+    resolving to the wrong chat, while an id cannot -- but switching an entry to
+    an id must not orphan the rows already captured under its old name.
+
+        @fxtradingvision                       -> target @fxtradingvision
+        -1001234567890=@taurustraders          -> target -1001234567890,
+                                                  rows still labelled
+                                                  @taurustraders
+    """
     if not path.exists():
         print(f"[warn] {path} not found; nothing to capture")
         return []
     channels = []
     for line in path.read_text(encoding="utf-8").splitlines():
         line = line.split("#", 1)[0].strip()
-        if line:
-            channels.append(line)
+        if not line:
+            continue
+        target, _, label = line.partition("=")
+        target = target.strip()
+        label = label.strip() or target
+        if re.fullmatch(r"-?\d+", target):
+            target = int(target)
+        channels.append((target, label))
     return channels
 
 
@@ -142,9 +163,13 @@ def build_client():
     return TelegramClient(StringSession(session), int(api_id), api_hash)
 
 
-def capture_channel(client, channel, index, new_rows, captured_at):
-    """Returns (n_new, n_edits, n_deletions) or raises."""
-    messages = [m for m in client.get_messages(channel, limit=FETCH_LIMIT) if m is not None]
+def capture_channel(client, entity, channel, index, new_rows, captured_at):
+    """Returns (n_new, n_edits, n_deletions) or raises.
+
+    entity is the already-resolved chat to read; channel is the label the rows
+    are written under.
+    """
+    messages = [m for m in client.get_messages(entity, limit=FETCH_LIMIT) if m is not None]
     if not messages:
         # An empty fetch is indistinguishable from a permissions/network
         # oddity, so it must never be read as "everything was deleted".
@@ -230,11 +255,28 @@ def main():
         if not client.is_user_authorized():
             sys.exit("[fatal] TG_SESSION is not authorized; regenerate the StringSession")
 
-        for i, channel in enumerate(channels):
+        for i, (target, channel) in enumerate(channels):
             captured_at = now_utc()
             try:
+                entity = client.get_entity(target)
+                # A username is not proof of identity. It can belong to a
+                # person (resolving to your private chat with them) or have
+                # been re-registered by someone else. Capturing either would
+                # file a sales DM as if it were the channel's signals, which is
+                # exactly the failure this check exists to make loud.
+                if not (isinstance(entity, Channel) and entity.broadcast):
+                    kind = type(entity).__name__
+                    print(
+                        f"[error] {channel}: resolves to {kind}, not a broadcast "
+                        f"channel; skipping. Run diagnose_channels.py and pin "
+                        f"this entry to a numeric id."
+                    )
+                    failed.append(channel)
+                    if i + 1 < len(channels):
+                        time.sleep(SLEEP_BETWEEN_CHANNELS)
+                    continue
                 n_new, n_edits, n_del = capture_channel(
-                    client, channel, index, new_rows, captured_at
+                    client, entity, channel, index, new_rows, captured_at
                 )
             except FloodWaitError as exc:
                 # Do not sleep out a long flood wait inside a 20-minute cron;

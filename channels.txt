@@ -8,3 +8,10 @@
 @s2tbylennart
 @phenexbillions
 @TopNotchForex
+
+# If an entry above is unresolved or resolves to the wrong chat, replace it
+# with the numeric id from `diagnose_channels.py` (Actions -> "diagnose
+# channels" -> Run workflow). Keep the old name as the label so the rows
+# already captured under it stay in the same series:
+#
+#   -1001234567890=@taurustraders
