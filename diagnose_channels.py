@@ -12,7 +12,9 @@ Nothing here writes to the evidence file. It only prints.
 Run it from the capture workflow so it sees the real TG_SESSION.
 """
 
+import difflib
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -46,6 +48,35 @@ def build_client():
     if missing:
         sys.exit(f"[fatal] missing required secrets: {', '.join(missing)}")
     return TelegramClient(StringSession(session), int(api_id), api_hash)
+
+
+def squash(text: str) -> str:
+    """Lowercase alphanumerics only, so '@TopNotchForex' and 'Top Notch Forex'
+    compare equal."""
+    return re.sub(r"[^a-z0-9]", "", (text or "").lower())
+
+
+def rank_candidates(wanted: str, dialogs, limit=3):
+    """Best-matching joined channels for a name that did not resolve.
+
+    Scores against both title and username: a channel's public username often
+    looks nothing like its display name, and the reverse is just as common.
+    """
+    target = squash(wanted)
+    scored = []
+    for eid, title, username in dialogs:
+        best = 0.0
+        for field in (title, username):
+            cand = squash(field)
+            if not cand:
+                continue
+            ratio = difflib.SequenceMatcher(None, target, cand).ratio()
+            if target and (target in cand or cand in target):
+                ratio = max(ratio, 0.9)
+            best = max(best, ratio)
+        scored.append((best, eid, title, username))
+    scored.sort(reverse=True)
+    return [s for s in scored[:limit] if s[0] > 0.3]
 
 
 def describe(entity):
@@ -85,12 +116,14 @@ def main():
         print("=" * 78)
         wrong_kind = []
         unresolved = []
+        broken = []
         for name in configured:
             try:
                 entity = client.get_entity(name)
             except Exception as exc:  # noqa: BLE001
                 print(f"\n{name}\n    UNRESOLVED: {type(exc).__name__}: {exc}")
                 unresolved.append(name)
+                broken.append(name)
                 continue
             kind, eid, title, username = describe(entity)
             print(f"\n{name}")
@@ -102,6 +135,7 @@ def main():
             if not (isinstance(entity, Channel) and entity.broadcast):
                 print("    ^^ NOT a broadcast channel - captured rows from this are not signals")
                 wrong_kind.append(name)
+                broken.append(name)
 
         print()
         print("=" * 78)
@@ -112,7 +146,6 @@ def main():
         print("to the wrong chat the way a username can.")
         print()
 
-        configured_ids = set()
         rows = []
         for dialog in client.iter_dialogs():
             entity = dialog.entity
@@ -125,10 +158,30 @@ def main():
         print(f"{'id':>16}  {'username':<26} {'last activity':<18} title")
         print("-" * 78)
         for date, eid, title, username in rows:
-            configured_ids.add(eid)
             uname = f"@{username}" if username else "(private)"
             when = f"{date:%Y-%m-%d %H:%M}" if date else "?"
             print(f"{eid:>16}  {uname:<26} {when:<18} {title}")
+
+        if broken:
+            dialogs = [(eid, title, username) for _, eid, title, username in rows]
+            print()
+            print("=" * 78)
+            print("PART 3 - suggested channels.txt lines for the broken entries")
+            print("=" * 78)
+            print("Best title/username matches among the channels you have joined.")
+            print("CHECK each one against the subscriber count and title in your app")
+            print("before pasting - this is a string match, not a confirmation.")
+            print()
+            for name in broken:
+                print(f"{name}:")
+                candidates = rank_candidates(name, dialogs)
+                if not candidates:
+                    print("    no similar joined channel found - find it in the app,")
+                    print("    then take its id from PART 2")
+                for score, eid, title, username in candidates:
+                    uname = f"@{username}" if username else "(private)"
+                    print(f"    {eid}={name}".ljust(44) + f"# {title}  {uname}  [match {score:.0%}]")
+                print()
 
         print()
         print("=" * 78)
