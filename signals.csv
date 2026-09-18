@@ -956,3 +956,27 @@ SL @ 4580
 Trade accordingly and only trade with money you can afford to LOSE.
 
 HIGH LOTSIZE",1.0
+@fxtradingvision,85617,2026-09-18T08:38:12Z,SHORT,XAUUSD,4410.0,4385.0,4384.0,4360.0,4410.0,"NEW TRADE IDEA
+
+XAUUSD SELL 4389
+
+TP 1 4385
+TP 2 4384
+TP 3 4360
+
+SL @ 4410
+
+Trade accordingly and only trade with money you can afford to LOSE.",1.0
+@fxtradingvision,85623,2026-09-18T09:24:11Z,LONG,XAUUSD,4380.0,4408.0,4409.0,4430.0,4404.0,"NEW TRADE IDEA
+
+XAUUSD BUY STOP 4404
+
+TP 1 4408
+TP 2 4409
+TP 3 4430
+
+SL @ 4380
+
+Trade accordingly and only trade with money you can afford to LOSE.
+
+DOUBLE LOTSIZE",1.0
