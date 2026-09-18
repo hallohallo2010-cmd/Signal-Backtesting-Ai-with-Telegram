@@ -1,17 +1,25 @@
-# One @username per line. Get each from the channel profile in Telegram.
-@wolfxsignals
-@taurustraders
-@fxfaro
-@fxtradingvision
-@fxculture
-@forexmanfx
-@s2tbylennart
-@phenexbillions
-@TopNotchForex
-
-# If an entry above is unresolved or resolves to the wrong chat, replace it
-# with the numeric id from `diagnose_channels.py` (Actions -> "diagnose
-# channels" -> Run workflow). Keep the old name as the label so the rows
-# already captured under it stay in the same series:
+# One entry per line: an @username, or a numeric channel id (which cannot
+# silently re-resolve to a different chat the way a username can). Add =label
+# to keep rows under an existing name.
 #
-#   -1001234567890=@taurustraders
+# Take the username from the channel's own QR code in the app (profile -> QR),
+# not from its display name. The two are unrelated, and guessing is what put
+# private sales DMs in this file for months.
+
+# --- confirmed, capturing correctly ---
+@fxtradingvision
+@phenexbillions              # supergroup, not a broadcast channel
+
+# --- confirmed by QR code, replacing a name that resolved to a sales DM ---
+# Rows land under the new name on purpose: the old rows came from a different
+# chat, and merging two entities into one series would corrupt the evidence.
+@WOLFXSIGNALS_FREEGROUP      # was @wolfxsignals -> a dead 2022 account
+@FXFARO_FREEGROUP            # was @fxfaro -> a private chat with "Daniel"
+
+# --- still wrong: no confirmed username yet ---
+# Each of these fails loudly every run until it is replaced.
+@taurustraders               # real channel is "TaurusTraders (TM)", 18656 subs
+@forexmanfx                  # real channel is "Forexman / Fx trading", 33108 subs
+@TopNotchForex               # real channel is "TNFX | FREE GROUP", 84787 subs
+@s2tbylennart                # real channel is "S2T by Lennart", 21663 subs
+@fxculture                   # real channel is "FX Culture | Free Signal Group"

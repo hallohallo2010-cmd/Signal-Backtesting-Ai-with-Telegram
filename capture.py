@@ -21,7 +21,7 @@ from pathlib import Path
 from telethon.sync import TelegramClient
 from telethon.sessions import StringSession
 from telethon.errors import FloodWaitError
-from telethon.tl.types import Channel
+from telethon.tl.types import Channel, User
 
 CHANNELS_FILE = Path(os.environ.get("CHANNELS_FILE", "channels.txt"))
 RAW_CSV = Path(os.environ.get("RAW_CSV", "raw_messages.csv"))
@@ -259,15 +259,18 @@ def main():
             captured_at = now_utc()
             try:
                 entity = client.get_entity(target)
-                # A username is not proof of identity. It can belong to a
-                # person (resolving to your private chat with them) or have
-                # been re-registered by someone else. Capturing either would
-                # file a sales DM as if it were the channel's signals, which is
-                # exactly the failure this check exists to make loud.
-                if not (isinstance(entity, Channel) and entity.broadcast):
-                    kind = type(entity).__name__
+                # A username is not proof of identity: it can belong to a
+                # person, in which case it resolves to your private chat with
+                # them and a sales DM gets filed as the channel's signals.
+                # That, and only that, is what this check is for. Signals are
+                # posted in supergroups as often as in broadcast channels, so
+                # the test is "is this a person", not "is this a broadcast" --
+                # a megagroup has broadcast=False and is a perfectly good
+                # source.
+                if isinstance(entity, User):
+                    what = "bot" if entity.bot else "private chat with a person"
                     print(
-                        f"[error] {channel}: resolves to {kind}, not a broadcast "
+                        f"[error] {channel}: resolves to a {what}, not a "
                         f"channel; skipping. Run diagnose_channels.py and pin "
                         f"this entry to a numeric id."
                     )
