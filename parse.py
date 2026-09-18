@@ -36,7 +36,11 @@ PATTERNS = {
     "__default__": {
         "direction": r"\b(buy|long|sell|short)\b",
         "symbol": r"\b(xau\s*/?\s*usd|xau|gold|gc\s*=\s*f|gc)\b",
-        "entry": r"(?:entry|enter|entry\s*price|buy\s*@|sell\s*@|@)[^0-9\n]{0,12}" + NUM,
+        # A bare "@" used to be an entry cue, but it matches the "@" in
+        # "SL @ 4410" just as happily, which silently files a stop loss as the
+        # entry. Anchor on the words instead, and treat a direction word
+        # followed by a price ("XAUUSD BUY 4435") as the entry it plainly is.
+        "entry": r"(?:entry|enter|\b(?:buy|sell|long|short)\b)[^0-9\n]{0,12}" + NUM,
         "tp1": r"(?:tp\s*1|take\s*profit\s*1|target\s*1|\btp\b|\btarget\b)[^0-9\n]{0,12}" + NUM,
         "tp2": r"(?:tp\s*2|take\s*profit\s*2|target\s*2)[^0-9\n]{0,12}" + NUM,
         "tp3": r"(?:tp\s*3|take\s*profit\s*3|target\s*3)[^0-9\n]{0,12}" + NUM,
