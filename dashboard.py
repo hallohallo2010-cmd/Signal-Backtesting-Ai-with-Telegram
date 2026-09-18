@@ -50,6 +50,12 @@ SERIES_COLORS = [
 MAX_CHARTED = len(SERIES_COLORS)
 COLOR_CRITICAL = "#d03b3b"
 
+# Facet geometry. One panel per channel, so colour carries no identity here
+# -- the panel heading does. That is what lets the faceted view cover every
+# channel while the overlay above stays capped at the palette size.
+FACET_W, FACET_H = 300.0, 120.0
+FACET_PAD_L, FACET_PAD_R, FACET_PAD_T, FACET_PAD_B = 8.0, 8.0, 10.0, 12.0
+
 csv.field_size_limit(10 * 1024 * 1024)
 
 
@@ -551,6 +557,23 @@ svg.equity .tick { font: 12px system-ui, sans-serif; fill: var(--muted);
                    font-variant-numeric: tabular-nums; }
 svg.equity .endlabel { font: 12px system-ui, sans-serif; fill: var(--ink-2); }
 svg.equity .endlabel.neg { fill: var(--crit); font-weight: 600; }
+.facets { display: grid; gap: 14px; margin: 16px 0 0;
+           grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+.facet { padding: 10px 12px 6px; background: var(--plane);
+         border: 1px solid var(--rule); border-radius: 8px;
+         display: flex; flex-direction: column; }
+/* These two reserve two lines each. A long channel name or a wrapped stat line
+   would otherwise push its own curve down, and the panels in a row would no
+   longer share a baseline -- which is the whole point of shared scales. */
+.facet h3 { margin: 0; font-size: 14px; font-weight: 600; color: var(--ink);
+            overflow-wrap: anywhere; line-height: 1.25; min-height: 2.5em; }
+.facet .fmeta { margin: 2px 0 0; font-size: 13px; color: var(--ink-2);
+                font-variant-numeric: tabular-nums;
+                line-height: 1.25; min-height: 2.5em; }
+.facet svg.facet-svg { margin-top: auto; }
+.facet .fmeta.neg { color: var(--crit); font-weight: 600; }
+.facet .fnone { margin: 8px 0 10px; font-size: 13px; color: var(--muted); }
+svg.facet-svg { display: block; width: 100%; height: auto; margin: 6px 0 0; }
 .readout {
   margin: 10px 0 0; padding: 12px 14px; min-height: 44px;
   background: var(--plane); border: 1px solid var(--rule); border-radius: 8px;
@@ -751,6 +774,120 @@ def section_chart(stats, svg, uncharted):
     )
 
 
+def build_facet(stat, x_min, x_max, y_lo, y_hi):
+    """One channel's equity curve on the shared scales. Colour encodes polarity
+    only -- the heading carries identity -- so this view has no series cap."""
+    coords = [
+        (t["ts"].timestamp(), cum)
+        for t, cum in zip(stat["trades"], stat["cumulative"])
+        if t["ts"]
+    ]
+    if not coords:
+        return ""
+
+    plot_w = FACET_W - FACET_PAD_L - FACET_PAD_R
+    plot_h = FACET_H - FACET_PAD_T - FACET_PAD_B
+
+    def sx(seconds):
+        return FACET_PAD_L + (seconds - x_min) / (x_max - x_min) * plot_w
+
+    def sy(value):
+        return FACET_PAD_T + (y_hi - value) / (y_hi - y_lo) * plot_h
+
+    negative = stat["expectancy"] < 0
+    color = COLOR_CRITICAL if negative else SERIES_COLORS[0]
+    zero_y = sy(0.0)
+
+    parts = [
+        f'<svg class="facet-svg" viewBox="0 0 {FACET_W:.0f} {FACET_H:.0f}" '
+        f'role="img" aria-label="{esc(stat["channel"])}: cumulative net points '
+        f'over {stat["n"]} scored trades, ending '
+        f'{stat["total_points"]:+.0f} points" '
+        f'xmlns="http://www.w3.org/2000/svg">'
+    ]
+    # Loss territory, then the zero rule on top of it: same language as the
+    # overlay chart above, so the two read as one system.
+    if zero_y < FACET_PAD_T + plot_h:
+        parts.append(
+            f'<rect x="{FACET_PAD_L}" y="{zero_y:.1f}" width="{plot_w:.1f}" '
+            f'height="{FACET_PAD_T + plot_h - zero_y:.1f}" fill="{COLOR_CRITICAL}" '
+            f'opacity="0.05"/>'
+        )
+    parts.append(
+        f'<line x1="{FACET_PAD_L}" y1="{zero_y:.1f}" '
+        f'x2="{FACET_PAD_L + plot_w:.1f}" y2="{zero_y:.1f}" '
+        f'stroke="#c3c2b7" stroke-width="1"/>'
+    )
+
+    points = " ".join(f"{sx(t):.1f},{sy(c):.1f}" for t, c in coords)
+    parts.append(
+        f'<polyline points="{points}" fill="none" stroke="{color}" '
+        f'stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>'
+    )
+    last_x, last_y = sx(coords[-1][0]), sy(coords[-1][1])
+    parts.append(
+        f'<circle cx="{last_x:.1f}" cy="{last_y:.1f}" r="4" fill="{color}" '
+        f'stroke="#ffffff" stroke-width="2"/>'
+    )
+    parts.append("</svg>")
+    return "".join(parts)
+
+
+def section_facets(stats):
+    """Every channel on its own panel, on shared scales.
+
+    The overlay above can only carry as many channels as the palette has
+    distinguishable hues. This view has no such limit, so it is the one that
+    always shows all of them -- and being one panel per channel, it answers
+    "how did this group do" without reading a single line out of a bundle.
+    """
+    if not stats:
+        return ""
+
+    plotted = [s for s in stats if s["cumulative"]]
+    xs = [t["ts"].timestamp() for s in plotted for t in s["trades"] if t["ts"]]
+    panels = []
+
+    if xs:
+        x_min, x_max = min(xs), max(xs)
+        if x_max <= x_min:
+            x_max = x_min + 3600.0
+        values = [v for s in plotted for v in s["cumulative"]] + [0.0]
+        y_lo, y_hi = min(values), max(values)
+        span = (y_hi - y_lo) or 1.0
+        y_lo, y_hi = y_lo - span * 0.08, y_hi + span * 0.08
+    else:
+        x_min = x_max = y_lo = y_hi = 0.0
+
+    for stat in stats:
+        negative = stat["expectancy"] < 0
+        svg = (
+            build_facet(stat, x_min, x_max, y_lo, y_hi)
+            if xs and stat["cumulative"]
+            else '<p class="fnone">No scored trades yet.</p>'
+        )
+        meta = (
+            f'{stat["total_points"]:+.0f} pts over {stat["n"]} trade(s) · '
+            f'{stat["expectancy"]:+.2f} pts/trade'
+        )
+        panels.append(
+            f'<div class="facet"><h3>{esc(stat["channel"])}</h3>'
+            f'<p class="fmeta{" neg" if negative else ""}">{meta}</p>'
+            f"{svg}</div>"
+        )
+
+    return (
+        '<h2><span class="num">4</span>Each channel on its own</h2>'
+        '<p class="lede">The same equity curves as above, one panel per '
+        "channel, so a single group can be read without picking its line out "
+        "of a bundle. Every channel appears here, including any the overlay "
+        "could not colour. All panels share one pair of scales, so panel "
+        "heights are directly comparable; a curve ending in the shaded band "
+        "below the rule finished behind.</p>"
+        f'<div class="facets">{"".join(panels)}</div>'
+    )
+
+
 def section_evidence(events, scored):
     outcome_by_key = {
         (row.get("channel"), row.get("message_id")): (row.get("outcome") or "").upper()
@@ -775,7 +912,7 @@ def section_evidence(events, scored):
 
     if not events:
         return (
-            '<h2><span class="num">4</span>Deletion and edit log</h2>'
+            '<h2><span class="num">5</span>Deletion and edit log</h2>'
             f'<p class="lede">{verdict}</p>'
         )
 
@@ -796,7 +933,7 @@ def section_evidence(events, scored):
             f'<td class="evtext">{esc(event["text"])}</td></tr>'
         )
     return (
-        '<h2><span class="num">4</span>Deletion and edit log</h2>'
+        '<h2><span class="num">5</span>Deletion and edit log</h2>'
         f'<p class="lede">{verdict} Every row here is a message the channel '
         "changed or removed after posting. Original text is always the first "
         "version captured.</p>"
@@ -961,6 +1098,7 @@ def render(stats, svg, js_points, events, scored, position_size, counts, unchart
             section_summary(stats)
             + section_calculator(stats, position_size)
             + section_chart(stats, svg, uncharted)
+            + section_facets(stats)
             + section_evidence(events, scored)
         )
     else:
