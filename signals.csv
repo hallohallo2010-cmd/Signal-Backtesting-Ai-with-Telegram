@@ -810,7 +810,7 @@ TP 3 4350
 SL @ 4300
 
 Trade accordingly and only trade with money you can afford to LOSE.",1.0
-@fxtradingvision,85401,2026-09-16T09:49:43Z,LONG,XAUUSD,4341.0,4345.0,4346.0,4370.0,4341.0,"NEW TRADE IDEA
+@fxtradingvision,85401,2026-09-16T09:49:43Z,LONG,XAUUSD,4341.0,4345.0,4346.0,4370.0,4315.0,"NEW TRADE IDEA
 
 XAUUSD BUY STOP 4341
 
@@ -823,7 +823,7 @@ SL @ 4315
 Trade accordingly and only trade with money you can afford to LOSE.
 
 WAIT FOR 4341 TO ENTER & USE HIGH LOT.",1.0
-@fxtradingvision,85410,2026-09-16T12:10:47Z,LONG,XAUUSD,4354.0,4358.0,4359.0,4390.0,4354.0,"NEW TRADE IDEA
+@fxtradingvision,85410,2026-09-16T12:10:47Z,LONG,XAUUSD,4354.0,4358.0,4359.0,4390.0,4335.0,"NEW TRADE IDEA
 
 XAUUSD BUY STOP 4354
 
@@ -869,7 +869,7 @@ TP 3 4285
 SL @ 4325
 
 Trade accordingly and only trade with money you can afford to LOSE.",1.0
-@fxtradingvision,85521,2026-09-17T11:05:42Z,LONG,XAUUSD,4336.0,4340.0,4341.0,4370.0,4336.0,"NEW TRADE IDEA
+@fxtradingvision,85521,2026-09-17T11:05:42Z,LONG,XAUUSD,4336.0,4340.0,4341.0,4370.0,4310.0,"NEW TRADE IDEA
 
 XAUUSD BUY STOP 4336
 
@@ -967,7 +967,7 @@ TP 3 4360
 SL @ 4410
 
 Trade accordingly and only trade with money you can afford to LOSE.",1.0
-@fxtradingvision,85623,2026-09-18T09:24:11Z,LONG,XAUUSD,4404.0,4408.0,4409.0,4430.0,4404.0,"NEW TRADE IDEA
+@fxtradingvision,85623,2026-09-18T09:24:11Z,LONG,XAUUSD,4404.0,4408.0,4409.0,4430.0,4380.0,"NEW TRADE IDEA
 
 XAUUSD BUY STOP 4404
 
@@ -976,6 +976,32 @@ TP 2 4409
 TP 3 4430
 
 SL @ 4380
+
+Trade accordingly and only trade with money you can afford to LOSE.
+
+DOUBLE LOTSIZE",1.0
+@fxtradingvision,85641,2026-09-18T11:14:53Z,SHORT,XAUUSD,4389.0,4385.0,4384.0,4360.0,4398.0,"NEW TRADE IDEA
+
+XAUUSD SELL 4389
+
+TP 1 4385
+TP 2 4384
+TP 3 4360
+
+SL @ 4398
+
+Trade accordingly and only trade with money you can afford to LOSE.
+
+DOUBLE LOTSIZE",1.0
+@fxtradingvision,85668,2026-09-18T16:33:45Z,SHORT,XAUUSD,4382.0,4378.0,4377.0,4350.0,4397.0,"NEW TRADE IDEA
+
+XAUUSD SELL 4382
+
+TP 1 4378
+TP 2 4377
+TP 3 4350
+
+SL @ 4397
 
 Trade accordingly and only trade with money you can afford to LOSE.
 
