@@ -1,4 +1,196 @@
 channel,message_id,timestamp_utc,direction,symbol,entry,tp1,tp2,tp3,sl,raw_text,parse_confidence
+@REALNATEFXC,5016,2026-09-15T10:42:48Z,LONG,XAUUSD,4274.0,4400.0,,,4250.0,"SIGNAL ALERT
+
+
+XAUUSD
+
+BUY
+
+ENTRY AREA 4274-4269
+
+🎯Target: 4400
+
+❌Stop loss: 4250
+
+This is not financial advice. This is a personal trade idea shared for educational and informational purposes only",1.0
+@REALNATEFXC,5038,2026-09-16T12:38:17Z,SHORT,XAUUSD,4343.0,4300.0,,,4362.0,"SIGNAL ALERT
+
+
+XAUUSD
+
+SELL
+
+ENTRY AREA 4343-4348
+
+🎯Target: 4300
+
+❌Stop loss: 4362
+
+This is not financial advice. This is a personal trade idea shared for educational and informational purposes only",1.0
+@REALNATEFXC,5054,2026-09-17T14:39:04Z,LONG,XAUUSD,,4410.0,,,4345.0,"BUY TRADE XAU/USD 
+
+4360-4363.8
+
+📍Stop Loss: 4345
+
+Target: 4410
+
+This is not financial advice. This is a personal trade idea shared for educational and informational purposes only.",0.9
+@REALNATEFXC,5062,2026-09-18T10:19:34Z,LONG,XAUUSD,,4430.0,,,4350.0,"BUY TRADE XAU/USD 
+
+4373.0-4378.0
+
+📍Stop Loss: 4350
+
+Target: 4430
+
+This is not financial advice. This is a personal trade idea shared for educational and informational purposes only.",0.9
+@TAURUSTRADERSSIGNALE,39690,2026-09-17T11:51:59Z,LONG,XAUUSD,4336.0,4340.0,4341.0,4370.0,4310.0,"NEW TRADE IDEA
+
+XAUUSD BUY STOP 4336
+
+TP 1 4340
+TP 2 4341
+TP 3 4370
+
+SL @ 4310
+
+Trade accordingly and only trade with money you can afford to LOSE.
+
+DOUBLE LOTSIZE",1.0
+@TAURUSTRADERSSIGNALE,39696,2026-09-17T13:30:42Z,LONG,XAUUSD,4375.0,4379.0,4380.0,4395.0,4355.0,"NEW TRADE IDEA
+
+XAUUSD BUY 4375
+
+TP 1 4379
+TP 2 4380
+TP 3 4395
+
+SL @ 4355
+
+Trade accordingly and only trade with money you can afford to LOSE.",1.0
+@TAURUSTRADERSSIGNALE,39698,2026-09-17T15:15:10Z,SHORT,XAUUSD,4358.0,4354.0,4353.0,4330.0,4375.0,"NEW TRADE IDEA
+
+XAUUSD SELL 4358
+
+TP 1 4354
+TP 2 4353
+TP 3 4330
+
+SL @ 4375
+
+Trade accordingly and only trade with money you can afford to LOSE.
+
+HIGH LOTSIZE",1.0
+@TAURUSTRADERSSIGNALE,39733,2026-09-18T14:23:36Z,SHORT,XAUUSD,4352.0,4348.0,4340.0,,4364.0,"NEW TRADE IDEA
+
+XAUUSD SELL 4352
+
+TP 4348
+
+TP 2 4340
+
+SL @ 4364
+
+Trade accordingly and only trade with money you can afford to LOSE.",1.0
+@TOPNOTCHFOREXFREE,23713,2026-09-09T07:52:31Z,SHORT,XAUUSD,4409.6,4407.3,4404.2,4394.2,4425.0,"🌎 SIGNAL ALERT!
+
+💰 SELL XAUUSD 4409.6
+
+🛩 TP1: 4407.3
+🛩 TP2: 4404.2
+🛩 TP3: 4394.2
+
+⛔️ SL: 4425.0",1.0
+@TOPNOTCHFOREXFREE,23724,2026-09-10T08:18:24Z,SHORT,XAUUSD,4406.1,4404.0,4401.2,4392.2,4420.0,"🌎 SIGNAL ALERT!
+
+💰 SELL XAUUSD 4406.1
+
+🛩 TP1: 4404.0
+🛩 TP2: 4401.2
+🛩 TP3: 4392.2
+
+⛔️ SL: 4420.0",1.0
+@TOPNOTCHFOREXFREE,23738,2026-09-11T07:16:42Z,SHORT,XAUUSD,4350.6,4348.4,4345.4,4335.7,4365.5,"🌎 SIGNAL ALERT!
+
+💰 SELL XAUUSD 4350.6
+
+🛩 TP1: 4348.4
+🛩 TP2: 4345.4
+🛩 TP3: 4335.7
+
+⛔️ SL: 4365.5",1.0
+@TOPNOTCHFOREXFREE,23756,2026-09-14T07:34:33Z,SHORT,XAUUSD,4317.0,4314.8,4311.9,4302.5,4331.5,"🌎 SIGNAL ALERT!
+
+💰 SELL XAUUSD 4317.0
+
+🛩 TP1: 4314.8
+🛩 TP2: 4311.9
+🛩 TP3: 4302.5
+
+⛔️ SL: 4331.5",1.0
+@TOPNOTCHFOREXFREE,23769,2026-09-15T07:21:43Z,SHORT,XAUUSD,4289.8,4287.3,4284.0,4273.1,4306.5,"🌎 SIGNAL ALERT!
+
+💰 SELL XAUUSD 4289.8
+
+🛩 TP1: 4287.3
+🛩 TP2: 4284.0
+🛩 TP3: 4273.1
+
+⛔️ SL: 4306.5",1.0
+@TOPNOTCHFOREXFREE,23782,2026-09-16T07:44:08Z,LONG,XAUUSD,4337.0,4339.4,4342.6,4353.0,4321.0,"🌎 SIGNAL ALERT!
+
+💰 BUY XAUUSD 4337.0
+
+🛩 TP1: 4339.4
+🛩 TP2: 4342.6
+🛩 TP3: 4353.0
+
+⛔️ SL: 4321.0",1.0
+@TOPNOTCHFOREXFREE,23794,2026-09-17T07:58:42Z,LONG,XAUUSD,4325.1,4327.4,4330.5,4340.5,4309.7,"🌎 SIGNAL ALERT!
+
+💰 BUY XAUUSD 4325.1
+
+🛩 TP1: 4327.4
+🛩 TP2: 4330.5
+🛩 TP3: 4340.5
+
+⛔️ SL: 4309.7",1.0
+@TOPNOTCHFOREXFREE,23801,2026-09-18T08:56:59Z,LONG,XAUUSD,4393.7,4395.2,4397.1,4403.4,4384.0,"🌎 SIGNAL ALERT!
+
+💰 BUY XAUUSD 4393.7
+
+🛩 TP1: 4395.2
+🛩 TP2: 4397.1
+🛩 TP3: 4403.4
+
+⛔️ SL: 4384.0",1.0
+@WOLFXSIGNALS_FREEGROUP,11597,2026-09-10T16:15:08Z,SHORT,XAUUSD,4360.0,4358.0,4355.0,4350.0,4368.0,"🔔 GOLD VIP SIGNAL 🔔
+
+XAUUSD 📉 SELL 4360.00
+
+💰TP1 4358.00
+💰TP2 4355.00
+💰TP3 4350.00
+🚫SL 4368.00
+
+——————————————————
+Check out our PDF, where we explain everything you need to know to follow our signals: wolfxsignals.com/get-started/ 
+
+📌QUESTION: Where to follow our Forex Signals? 👉 {HERE}",1.0
+@WOLFXSIGNALS_FREEGROUP,11653,2026-09-18T14:45:06Z,LONG,XAUUSD,4354.0,4356.0,4359.0,4364.0,4346.0,"🔔 GOLD VIP SIGNAL 🔔
+
+XAUUSD 📈 BUY 4354.00
+
+💰TP1 4356.00
+💰TP2 4359.00
+💰TP3 4364.00
+🚫SL 4346.00
+
+——————————————————
+Check out our PDF, where we explain everything you need to know to follow our signals: wolfxsignals.com/get-started/ 
+
+📌QUESTION: Where to follow our Forex Signals? 👉 {HERE}",1.0
 @fxtradingvision,84212,2026-09-02T14:09:23Z,LONG,XAUUSD,4394.0,4398.0,4399.0,4430.0,4370.0,"NEW TRADE IDEA
 
 XAUUSD BUY 4394
