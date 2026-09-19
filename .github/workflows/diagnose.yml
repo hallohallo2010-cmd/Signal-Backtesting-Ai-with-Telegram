@@ -1,0 +1,37 @@
+name: diagnose channels
+
+# Manual only. This reads your account's dialog list, which the 20-minute
+# capture cron has no business doing on every run.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install telethon
+
+      # Prints only. Nothing is committed: the output is a diagnosis, and the
+      # channel list it suggests is yours to apply deliberately.
+      - name: Resolve every channels.txt entry
+        env:
+          TG_API_ID: ${{ secrets.TG_API_ID }}
+          TG_API_HASH: ${{ secrets.TG_API_HASH }}
+          TG_SESSION: ${{ secrets.TG_SESSION }}
+        run: python diagnose_channels.py

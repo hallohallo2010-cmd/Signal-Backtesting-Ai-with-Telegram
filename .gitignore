@@ -11,3 +11,8 @@ venv/
 
 # Pages build directory, assembled in CI
 _site/
+
+# Generated on every run from the CSVs, and copied to the Pages site
+# directly from disk. Committing it created a timestamp-only commit every
+# run that conflicted with every open branch.
+report.html

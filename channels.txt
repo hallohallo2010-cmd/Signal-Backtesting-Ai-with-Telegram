@@ -1,10 +1,32 @@
-# One @username per line. Get each from the channel profile in Telegram.
-@wolfxsignals
-@taurustraders
-@fxfaro
+# One entry per line: an @username, or a numeric channel id (which cannot
+# silently re-resolve to a different chat the way a username can). Add =label
+# to keep rows under an existing name. Case does not matter to Telegram; these
+# are written as the QR screen shows them so they can be checked against it.
+#
+# Take the username from the channel's own QR code in the app (profile -> QR),
+# not from its display name. The two are unrelated, and guessing is what put
+# private sales DMs in this file for months.
+
+# --- already capturing correctly ---
 @fxtradingvision
-@fxculture
-@forexmanfx
-@s2tbylennart
-@phenexbillions
-@TopNotchForex
+@phenexbillions                 # supergroup, not a broadcast channel
+
+# --- confirmed by QR code ---
+# Rows land under the new names on purpose: the old names resolved to different
+# chats, and merging two entities into one series would corrupt the evidence
+# rather than extend it.
+@WOLFXSIGNALS_FREEGROUP         # was @wolfxsignals -> a dead 2022 account
+@FXFARO_FREEGROUP               # was @fxfaro -> a private chat with "Daniel"
+@TOPNOTCHFOREXFREE              # was @TopNotchForex -> resolved to nothing
+@TAURUSTRADERSSIGNALE           # was @taurustraders -> resolved to nothing
+@FREESIGNALSTOTRADEBYLENNART    # was @s2tbylennart -> a bulk-forward chat
+@REALNATEFXC                    # was @fxculture -> a sales DM with "Nate".
+                                # The name pattern suggests a personal account;
+                                # if it is one, capture.py rejects it by name
+                                # rather than filing the DM as signals again.
+
+# --- new, was never configured ---
+@TRADINGCENTRALGLOBAL           # "Trading Central FX | Forex Signals"
+
+# --- still wrong: no QR code seen yet ---
+@forexmanfx                     # real channel is "Forexman / Fx trading", 33108 subs

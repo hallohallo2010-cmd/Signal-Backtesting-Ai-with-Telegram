@@ -98,7 +98,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
-      contents: write   # commit report.html
+      contents: write   # commit the regenerated CSVs
       pages: write      # deploy to GitHub Pages
       id-token: write   # OIDC token the Pages deployment needs
     environment:
@@ -141,7 +141,13 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
           targets=""
-          for f in *.csv report.html; do
+          # report.html is NOT committed. It is regenerated from the CSVs on
+          # every run, so committing it produced a commit every couple of hours
+          # whose only change was the generated-at timestamp -- which collided
+          # with any open branch and made the repository unmergeable. The
+          # published site copies it straight from disk below, so nothing
+          # downstream needs it in git.
+          for f in *.csv; do
             if [ -e "$f" ]; then targets="$targets $f"; fi
           done
           if [ -z "$targets" ]; then
