@@ -30,25 +30,28 @@ csv.field_size_limit(10 * 1024 * 1024)
 # Every pattern must expose the value as capture group 1. Patterns are applied
 # with IGNORECASE | MULTILINE. Fields you omit are simply treated as absent.
 # --------------------------------------------------------------------------
-NUM = r"(\d[\d,]{0,6}(?:\.\d{1,3})?)"
+NUM = r"(\d[\d,]{0,6}(?:\.\d{1,5})?)"   # 5 dp: FX quotes like 1.21704
 
 PATTERNS = {
     "__default__": {
         "direction": r"\b(buy|long|sell|short)\b",
-        "symbol": r"\b(xau\s*/?\s*usd|xau|gold|gc\s*=\s*f|gc)\b",
+        "symbol": r"\b(xau\s*/?\s*usd|xau|gold|gc\s*=\s*f|gc"
+                  r"|(?:eur|usd|gbp|jpy|chf|aud|nzd|cad)\s*/?\s*"
+                  r"(?:eur|usd|gbp|jpy|chf|aud|nzd|cad))\b",
         # A bare "@" used to be an entry cue, but it matches the "@" in
         # "SL @ 4410" just as happily, which silently files a stop loss as the
         # entry. Anchor on the words instead, and treat a direction word
         # followed by a price ("XAUUSD BUY 4435") as the entry it plainly is.
         "entry": r"(?:entry|enter|\b(?:buy|sell|long|short)\b)[^0-9\n]{0,12}" + NUM,
-        "tp1": r"(?:tp\s*1|take\s*profit\s*1|target\s*1|\btp\b|\btarget\b)[^0-9\n]{0,12}" + NUM,
-        "tp2": r"(?:tp\s*2|take\s*profit\s*2|target\s*2)[^0-9\n]{0,12}" + NUM,
-        "tp3": r"(?:tp\s*3|take\s*profit\s*3|target\s*3)[^0-9\n]{0,12}" + NUM,
+        "tp1": r"(?:tp\s*1|take[\s-]*profit[\s-]*1|target\s*1|\btp\b|\btarget\b)"
+               r"[^0-9\n]{0,12}" + NUM,
+        "tp2": r"(?:tp\s*2|take[\s-]*profit[\s-]*2|target\s*2)[^0-9\n]{0,12}" + NUM,
+        "tp3": r"(?:tp\s*3|take[\s-]*profit[\s-]*3|target\s*3)[^0-9\n]{0,12}" + NUM,
         # "\bstop\b" must not swallow the order type in "XAUUSD BUY STOP 4341":
         # that number is the entry, and taking it as the stop loss puts the stop
         # exactly on the entry -- a zero-width stop that score.py then simulates
         # as an instant loss. The real "SL @ 4315" sits further along the line.
-        "sl": r"(?:sl|s/l|stop\s*loss|stoploss|(?<!buy )(?<!sell )\bstop\b)"
+        "sl": r"(?:sl|s/l|stopp?[\s-]*loss|(?<!buy )(?<!sell )\bstopp?\b)"
               r"[^0-9\n]{0,12}" + NUM,
     },
     # ------------------------------------------------------------------
@@ -75,9 +78,28 @@ SHORT_WORDS = {"sell", "short"}
 # has one symbol to map onto GC=F.
 GOLD_ALIASES = {"xauusd", "xau/usd", "xau", "gold", "gc", "gc=f"}
 
-# Gold trades in the low thousands. A "price" outside this band is a parse
-# artefact (a date, a percentage, a pip count), not a level.
-PRICE_MIN, PRICE_MAX = 100.0, 100000.0
+# The currencies these channels actually quote. A pair is two of these, which
+# is what separates a real symbol from any other six-letter run of capitals.
+CURRENCIES = ("EUR", "USD", "GBP", "JPY", "CHF", "AUD", "NZD", "CAD")
+
+# A "price" outside its instrument's band is a parse artefact -- a date, a
+# percentage, a pip count -- not a level. One global band cannot do this job:
+# gold trades near 4400 and GBPCAD near 1.86, so a floor that keeps a pip count
+# out of gold throws away every FX level ever posted.
+GOLD_BAND = (500.0, 20000.0)
+JPY_BAND = (50.0, 500.0)     # anything quoted in yen: USDJPY ~150, GBPJPY ~190
+FX_BAND = (0.3, 5.0)         # every other pair quotes around 1
+
+
+def band_for(symbol: str):
+    """The plausible price range for a symbol, or None if it is not priceable."""
+    if not symbol:
+        return None
+    if symbol == "XAUUSD":
+        return GOLD_BAND
+    if len(symbol) == 6 and symbol[:3] in CURRENCIES and symbol[3:] in CURRENCIES:
+        return JPY_BAND if symbol[3:] == "JPY" else FX_BAND
+    return None
 
 # A row only becomes a signal if it has everything scoring requires.
 REQUIRED_FIELDS = ("direction", "symbol", "tp1", "sl")
@@ -118,14 +140,16 @@ def search(pattern, text):
     return match.group(1) if match else None
 
 
-def to_price(value):
-    if value is None:
+def to_price(value, band):
+    """A number is only a price if it falls in its own instrument's band."""
+    if value is None or band is None:
         return None
     try:
         price = float(str(value).replace(",", "").strip())
     except ValueError:
         return None
-    if not (PRICE_MIN <= price <= PRICE_MAX):
+    low, high = band
+    if not (low <= price <= high):
         return None
     return price
 
@@ -147,17 +171,24 @@ def parse_message(channel: str, text: str):
     raw_symbol = search(spec.get("symbol"), text)
     symbol = None
     if raw_symbol:
-        flat = re.sub(r"\s+", "", raw_symbol).lower()
-        symbol = "XAUUSD" if flat in GOLD_ALIASES else raw_symbol.strip().upper()
+        # "EUR / USD", "eurusd" and "EUR/USD" are one symbol; squash everything
+        # that is not a letter or digit before deciding.
+        flat = re.sub(r"[^a-z0-9=]", "", raw_symbol.lower())
+        symbol = "XAUUSD" if flat in GOLD_ALIASES else flat.upper()
+
+    # The band depends on the symbol, so it has to be resolved first: 1.86 is a
+    # real GBPCAD level and a parse artefact on gold, and only the symbol says
+    # which this is.
+    band = band_for(symbol)
 
     fields = {
         "direction": direction,
         "symbol": symbol,
-        "entry": to_price(search(spec.get("entry"), text)),
-        "tp1": to_price(search(spec.get("tp1"), text)),
-        "tp2": to_price(search(spec.get("tp2"), text)),
-        "tp3": to_price(search(spec.get("tp3"), text)),
-        "sl": to_price(search(spec.get("sl"), text)),
+        "entry": to_price(search(spec.get("entry"), text), band),
+        "tp1": to_price(search(spec.get("tp1"), text), band),
+        "tp2": to_price(search(spec.get("tp2"), text), band),
+        "tp3": to_price(search(spec.get("tp3"), text), band),
+        "sl": to_price(search(spec.get("sl"), text), band),
     }
 
     if any(fields[name] is None for name in REQUIRED_FIELDS):
