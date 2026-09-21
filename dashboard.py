@@ -25,6 +25,7 @@ from pathlib import Path
 SCORED_CSV = Path("scored.csv")
 SIGNALS_CSV = Path("signals.csv")
 RAW_CSV = Path("raw_messages.csv")
+NEAR_MISS_CSV = Path("near_misses.csv")
 OUT_HTML = Path(os.environ.get("REPORT_HTML", "report.html"))
 
 DEFAULT_CHF_PER_POINT = 0.1
@@ -113,6 +114,40 @@ def truncate(text: str, limit: int = TEXT_TRUNCATE) -> str:
 # --------------------------------------------------------------------------
 # per-channel statistics
 # --------------------------------------------------------------------------
+
+# Hand-set notes. Each records a judgement the numbers alone do not make:
+# WHY a channel has no scored trades. The near-miss count printed beside it is
+# computed from the messages, and contradicts the note if the parser is in fact
+# at fault -- which is the check these notes exist to survive, having twice
+# been wrong in the other direction.
+CHANNEL_STATUS = {
+    "@phenexbillions": "image-only, not supported",
+    "@FXFARO_FREEGROUP": "FX pairs, not scored",
+    "@FREESIGNALSTOTRADEBYLENNART": "FX pairs, not scored",
+    "@forexmanfx": "username unresolved, not fetching",
+}
+
+
+def read_near_misses():
+    """channel -> count of messages that look like a signal and did not parse."""
+    counts = {}
+    if not NEAR_MISS_CSV.exists():
+        return counts
+    for row in read_csv(NEAR_MISS_CSV):
+        counts[row["channel"]] = counts.get(row["channel"], 0) + 1
+    return counts
+
+
+def status_for(channel, stat, near):
+    """The note shown against a channel, and whether it is a warning."""
+    note = CHANNEL_STATUS.get(channel, "")
+    if not note and stat["n"] == 0:
+        note = "no scored trades"
+    if near:
+        tail = f"{near} near-miss" + ("es" if near > 1 else "")
+        note = f"{note} · {tail}" if note else tail
+    return note
+
 
 def read_configured_channels():
     """The channels channels.txt asks for, in file order.
@@ -539,6 +574,7 @@ h2 .num { color: var(--muted); font-weight: 600; margin-right: 8px; }
 p { margin: 8px 0; }
 .lede { color: var(--ink-2); margin: 0 0 4px; }
 .note { color: var(--ink-2); font-size: 14px; }
+td.status { font-size: 13px; color: var(--ink-2); max-width: 200px; }
 .muted { color: var(--muted); }
 small { font-size: 13px; }
 code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; }
@@ -652,9 +688,9 @@ def pct_cell(count, total):
     return f'{count} <span class="sub">{100.0 * count / total:.0f}%</span>'
 
 
-def section_summary(stats):
+def section_summary(stats, near_misses):
     head = (
-        "<tr><th>Channel</th><th>Total Signals</th><th>Trades Scored</th>"
+        "<tr><th>Channel</th><th>Status</th><th>Total Signals</th><th>Trades Scored</th>"
         "<th>TP1 Hit</th><th>TP2 Hit<sup>*</sup></th><th>TP3 Hit<sup>*</sup></th>"
         "<th>SL Hit</th><th>Timeout</th><th>Win Rate</th>"
         "<th>Avg Points per Trade</th></tr>"
@@ -683,7 +719,8 @@ def section_summary(stats):
             f'<tr><td><span class="chan">{dot}{esc(stat["channel"])}</span>'
             + (f"<br>{badge}" if badge else "")
             + "</td>"
-            f'<td>{stat["total_signals"]}</td><td>{n}</td>'
+            + f'<td class="status">{esc(status_for(stat["channel"], stat, near_misses.get(stat["channel"], 0)))}</td>'
+            + f'<td>{stat["total_signals"]}</td><td>{n}</td>'
             f'<td>{pct_cell(stat["wins"], n)}</td><td>{tp2}</td><td>{tp3}</td>'
             f'<td>{pct_cell(stat["losses"], n)}</td>'
             f'<td>{pct_cell(stat["timeouts"], n)}</td>'
@@ -1141,13 +1178,14 @@ def section_caveat():
     )
 
 
-def render(stats, svg, js_points, events, scored, position_size, counts, uncharted):
+def render(stats, svg, js_points, events, scored, position_size, counts, uncharted,
+           near_misses):
     generated = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
 
     if stats:
         body = (
             section_caveat()
-            + section_summary(stats)
+            + section_summary(stats, near_misses)
             + section_calculator(stats, position_size)
             + section_chart(stats, svg, uncharted)
             + section_facets(stats)
@@ -1226,6 +1264,7 @@ def main():
         signal_counts[row["channel"]] = signal_counts.get(row["channel"], 0) + 1
 
     configured = read_configured_channels()
+    near_misses = read_near_misses()
     stats = channel_stats(scored, signal_counts, configured)
     events = deletion_events(raw)
     svg, js_points = build_chart(stats)
@@ -1242,7 +1281,8 @@ def main():
 
     OUT_HTML.write_text(
         render(
-            stats, svg, js_points, events, scored, position_size, counts, uncharted
+            stats, svg, js_points, events, scored, position_size, counts, uncharted,
+            near_misses,
         ),
         encoding="utf-8",
     )
