@@ -1098,20 +1098,9 @@ JS = """
 PLACEHOLDER_TEXT = "No scored signals yet — check back after the first scoring run"
 
 # Set to None once distance-based scoring lands; the banner disappears with it.
-SCORING_CAVEAT = (
-    "Point and expectancy figures on this page are not currently reliable",
-    "Signals quote <strong>spot</strong> gold. score.py prices them against "
-    "<strong>GC=F</strong>, the gold future, which carries a premium over spot: "
-    "measured at a median of about 40 points across this sample. "
-    "Every level is therefore compared against a price shifted by roughly that "
-    "much, and <strong>95% of scored trades (102 of 107) were entered at a "
-    "price already beyond their own take-profit or stop</strong>.",
-    "The direction of each trade is still recorded correctly, and the capture "
-    "and parsing below are unaffected. What is unreliable is every figure "
-    "derived from an entry price: expectancy, net points, win rate and the "
-    "equity curves. Treat them as provisional until scoring is measured from "
-    "the signal's stated distances rather than its absolute levels.",
-)
+# The spot-versus-futures error this warned about is fixed: score.py now
+# restates each signal's levels in futures terms before walking the path.
+SCORING_CAVEAT = None
 
 
 def section_caveat():
