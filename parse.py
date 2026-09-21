@@ -33,6 +33,8 @@ csv.field_size_limit(10 * 1024 * 1024)
 NUM = r"(\d[\d,]{0,6}(?:\.\d{1,5})?)"   # 5 dp: FX quotes like 1.21704
 
 PATTERNS = {
+    # "TP #1: 4284" -- the hash matters. Without it \btp\b matches "TP",
+    # the gap eats " #", and NUM captures the 1 of "#1" as the price.
     "__default__": {
         "direction": r"\b(buy|long|sell|short)\b",
         "symbol": r"\b(xau\s*/?\s*usd|xau|gold|gc\s*=\s*f|gc"
@@ -43,10 +45,11 @@ PATTERNS = {
         # entry. Anchor on the words instead, and treat a direction word
         # followed by a price ("XAUUSD BUY 4435") as the entry it plainly is.
         "entry": r"(?:entry|enter|\b(?:buy|sell|long|short)\b)[^0-9\n]{0,12}" + NUM,
-        "tp1": r"(?:tp\s*1|take[\s-]*profit[\s-]*1|target\s*1|\btp\b|\btarget\b)"
+        "tp1": r"(?:tp\s*#?\s*1|take[\s-]*profit[\s-]*#?\s*1|target\s*#?\s*1"
+               r"|\btp\b|\btarget\b)"
                r"[^0-9\n]{0,12}" + NUM,
-        "tp2": r"(?:tp\s*2|take[\s-]*profit[\s-]*2|target\s*2)[^0-9\n]{0,12}" + NUM,
-        "tp3": r"(?:tp\s*3|take[\s-]*profit[\s-]*3|target\s*3)[^0-9\n]{0,12}" + NUM,
+        "tp2": r"(?:tp\s*#?\s*2|take[\s-]*profit[\s-]*#?\s*2|target\s*#?\s*2)[^0-9\n]{0,12}" + NUM,
+        "tp3": r"(?:tp\s*#?\s*3|take[\s-]*profit[\s-]*#?\s*3|target\s*#?\s*3)[^0-9\n]{0,12}" + NUM,
         # "\bstop\b" must not swallow the order type in "XAUUSD BUY STOP 4341":
         # that number is the entry, and taking it as the stop loss puts the stop
         # exactly on the entry -- a zero-width stop that score.py then simulates

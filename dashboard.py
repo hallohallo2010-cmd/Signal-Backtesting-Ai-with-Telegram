@@ -114,10 +114,32 @@ def truncate(text: str, limit: int = TEXT_TRUNCATE) -> str:
 # per-channel statistics
 # --------------------------------------------------------------------------
 
-def channel_stats(scored, signal_counts):
+def read_configured_channels():
+    """The channels channels.txt asks for, in file order.
+
+    A channel that fetched nothing, or parsed nothing, is a finding -- it is
+    the difference between "this channel loses money" and "we never saw this
+    channel". Leaving it out of the tables hides exactly the case worth seeing.
+    """
+    path = Path("channels.txt")
+    if not path.exists():
+        return []
+    out = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.split("#", 1)[0].strip()
+        if not line:
+            continue
+        target, _, label = line.partition("=")
+        out.append(label.strip() or target.strip())
+    return out
+
+
+def channel_stats(scored, signal_counts, configured=()):
     """One dict per channel. Trades stay in timestamp order so the equity
     curve and the streak windows follow the sequence actually traded."""
-    by_channel = {}
+    # Seed every configured channel so one with no scored trades still gets a
+    # row, rather than vanishing from the report.
+    by_channel = {channel: [] for channel in configured}
     for row in scored:
         net = num(row.get("points_net"))
         if net is None:
@@ -196,8 +218,13 @@ def channel_stats(scored, signal_counts):
     # Most-traded first: the channels with the strongest evidence lead, and the
     # colour a channel gets stays stable as long as its rank does.
     stats.sort(key=lambda s: (-s["n"], s["channel"]))
-    for i, stat in enumerate(stats):
-        stat["color"] = SERIES_COLORS[i] if i < MAX_CHARTED else None
+    charted = 0
+    for stat in stats:
+        if stat["n"] and charted < MAX_CHARTED:
+            stat["color"] = SERIES_COLORS[charted]
+            charted += 1
+        else:
+            stat["color"] = None
     return stats
 
 
@@ -1155,7 +1182,7 @@ def render(stats, svg, js_points, events, scored, position_size, counts, unchart
 <body>
 <div class="wrap">
 <h1>Telegram Signal Audit</h1>
-<p class="lede">Generated {generated} · {counts["channels"]} channel(s) ·
+<p class="lede">Generated {generated} · {counts["channels"]} configured channel(s) ·
 {counts["signals"]} parsed signal(s) · {counts["scored"]} settled trade(s) ·
 {counts["deletions"]} deletion(s) · {counts["edits"]} edit(s)</p>
 <p class="note">Net of 3 points of round-trip costs. TP1 and SL inside the same
@@ -1198,13 +1225,15 @@ def main():
     for row in signals:
         signal_counts[row["channel"]] = signal_counts.get(row["channel"], 0) + 1
 
-    stats = channel_stats(scored, signal_counts)
+    configured = read_configured_channels()
+    stats = channel_stats(scored, signal_counts, configured)
     events = deletion_events(raw)
     svg, js_points = build_chart(stats)
     uncharted = sum(1 for stat in stats if not stat["color"])
 
     counts = {
-        "channels": len({row["channel"] for row in raw} | set(signal_counts)) or len(stats),
+        "channels": len(configured) or len(stats),
+        "retired": len({row["channel"] for row in raw} - set(configured)),
         "signals": len(signals),
         "scored": len(scored),
         "deletions": sum(1 for e in events if e["kind"] == "deleted"),
