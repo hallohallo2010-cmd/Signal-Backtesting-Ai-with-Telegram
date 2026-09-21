@@ -19,6 +19,7 @@ from pathlib import Path
 
 RAW_CSV = Path("raw_messages.csv")
 SIGNALS_CSV = Path("signals.csv")
+NEAR_MISS_CSV = Path("near_misses.csv")
 
 csv.field_size_limit(10 * 1024 * 1024)
 
@@ -106,6 +107,59 @@ def band_for(symbol: str):
 
 # A row only becomes a signal if it has everything scoring requires.
 REQUIRED_FIELDS = ("direction", "symbol", "tp1", "sl")
+
+# A near miss is a message that looks like a signal and did not parse: it names
+# a direction and carries a number that could be a gold price. Twice now a
+# channel was written off as posting "only marketing" when the truth was a
+# parser gap -- @TRADINGCENTRALGLOBAL's "TP #1" and, earlier, an FX channel
+# whose levels fell through a gold-shaped price band. Counting these makes the
+# difference checkable instead of a matter of opinion: near misses mean the
+# parser is failing, and only a channel with none is genuinely not posting.
+NEAR_MISS_DIRECTION = re.compile(r"\b(buy|sell|long|short)\b", re.I)
+NEAR_MISS_NUMBER = re.compile(r"\b(\d[\d,]{2,6}(?:\.\d{1,5})?)\b")
+
+NEAR_MISS_COLUMNS = [
+    "channel",
+    "message_id",
+    "timestamp_utc",
+    "found_direction",
+    "found_symbol",
+    "found_tp1",
+    "found_sl",
+    "missing",
+    "text",
+]
+
+
+def near_miss_reason(channel: str, text: str):
+    """Why this signal-shaped message did not parse, or None if it is not
+    signal-shaped at all."""
+    if not NEAR_MISS_DIRECTION.search(text):
+        return None
+    lo, hi = GOLD_BAND
+    if not any(
+        lo <= float(m.replace(",", "")) <= hi
+        for m in NEAR_MISS_NUMBER.findall(text)
+    ):
+        return None
+
+    spec = patterns_for(channel)
+    band = GOLD_BAND
+    found = {
+        "direction": search(spec.get("direction"), text),
+        "symbol": search(spec.get("symbol"), text),
+        "tp1": to_price(search(spec.get("tp1"), text), band),
+        "sl": to_price(search(spec.get("sl"), text), band),
+    }
+    missing = [name for name, value in found.items() if value in (None, "")]
+    if not missing:
+        # Every field was found and the message still did not parse, so the
+        # rejection came from the coherence check: a long whose stop sits above
+        # its target, or a short whose stop sits below it. That is the channel
+        # posting an incoherent signal, not the parser failing to read one, and
+        # the report should say so rather than show an empty reason.
+        missing = ["level-contradiction"]
+    return found, missing
 
 # Confidence weights; extra take-profits do not add confidence.
 WEIGHTS = {"direction": 0.25, "symbol": 0.25, "tp1": 0.2, "sl": 0.2, "entry": 0.1}
@@ -228,15 +282,33 @@ def main():
         first_version[key] = row
 
     signals = []
+    near_misses = []
     seen = defaultdict(int)
     parsed = defaultdict(int)
     unparsed = defaultdict(list)
 
     for (channel, message_id), row in first_version.items():
         seen[channel] += 1
-        fields = parse_message(channel, row.get("text", ""))
+        text = row.get("text", "") or ""
+        fields = parse_message(channel, text)
         if fields is None:
             unparsed[channel].append(message_id)
+            reason = near_miss_reason(channel, text)
+            if reason is not None:
+                found, missing = reason
+                near_misses.append(
+                    {
+                        "channel": channel,
+                        "message_id": message_id,
+                        "timestamp_utc": row.get("timestamp_utc", ""),
+                        "found_direction": found["direction"] or "",
+                        "found_symbol": found["symbol"] or "",
+                        "found_tp1": "" if found["tp1"] is None else found["tp1"],
+                        "found_sl": "" if found["sl"] is None else found["sl"],
+                        "missing": "|".join(missing),
+                        "text": text,
+                    }
+                )
             continue
         parsed[channel] += 1
         signals.append(
@@ -262,14 +334,25 @@ def main():
         writer.writeheader()
         writer.writerows(signals)
 
-    print(f"\nwrote {len(signals)} signal(s) to {SIGNALS_CSV}\n")
-    print(f"{'channel':<32} {'messages':>9} {'parsed':>7} {'unparsed':>9} {'edits':>6}")
-    print("-" * 68)
+    near_misses.sort(key=lambda r: (r["channel"], r["timestamp_utc"]))
+    with NEAR_MISS_CSV.open("w", encoding="utf-8", newline="") as fh:
+        writer = csv.DictWriter(fh, fieldnames=NEAR_MISS_COLUMNS)
+        writer.writeheader()
+        writer.writerows(near_misses)
+
+    print(f"\nwrote {len(signals)} signal(s) to {SIGNALS_CSV}")
+    print(f"wrote {len(near_misses)} near miss(es) to {NEAR_MISS_CSV}\n")
+    near_by_channel = defaultdict(int)
+    for row in near_misses:
+        near_by_channel[row["channel"]] += 1
+    print(f"{'channel':<32} {'messages':>9} {'parsed':>7} {'unparsed':>9} "
+          f"{'near':>5} {'edits':>6}")
+    print("-" * 75)
     for channel in sorted(seen):
         n_unparsed = len(unparsed[channel])
         print(
             f"{channel:<32} {seen[channel]:>9} {parsed[channel]:>7} "
-            f"{n_unparsed:>9} {revisions[channel]:>6}"
+            f"{n_unparsed:>9} {near_by_channel[channel]:>5} {revisions[channel]:>6}"
         )
     print(
         "\nUnparsed messages stay in raw_messages.csv only. A high unparsed "
