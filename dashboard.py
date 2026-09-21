@@ -589,6 +589,14 @@ svg.facet-svg { display: block; width: 100%; height: auto; margin: 6px 0 0; }
   background: var(--plane); border: 1px solid var(--rule);
 }
 .banner strong { display: block; font-size: 18px; margin-bottom: 6px; }
+.banner.warn { background: #fdf3f3; border: 2px solid var(--crit); }
+.banner.warn strong { color: var(--crit); }
+.banner.warn p { margin: 8px 0 0; color: var(--ink); }
+/* .banner strong is display:block for the heading; inside a paragraph that
+   would break the sentence into fragments at every emphasis. */
+.banner.warn p strong { display: inline; font-size: inherit; margin: 0;
+                        color: var(--crit); }
+.banner.warn .small { font-size: 14px; color: var(--ink-2); }
 .rules { padding-left: 22px; margin: 10px 0; }
 .rules li { margin: 6px 0; color: var(--ink-2); }
 .evtext { white-space: normal; max-width: 340px; text-align: left;
@@ -1089,13 +1097,41 @@ JS = """
 
 PLACEHOLDER_TEXT = "No scored signals yet — check back after the first scoring run"
 
+# Set to None once distance-based scoring lands; the banner disappears with it.
+SCORING_CAVEAT = (
+    "Point and expectancy figures on this page are not currently reliable",
+    "Signals quote <strong>spot</strong> gold. score.py prices them against "
+    "<strong>GC=F</strong>, the gold future, which carries a premium over spot: "
+    "measured at a median of about 40 points across this sample. "
+    "Every level is therefore compared against a price shifted by roughly that "
+    "much, and <strong>95% of scored trades (102 of 107) were entered at a "
+    "price already beyond their own take-profit or stop</strong>.",
+    "The direction of each trade is still recorded correctly, and the capture "
+    "and parsing below are unaffected. What is unreliable is every figure "
+    "derived from an entry price: expectancy, net points, win rate and the "
+    "equity curves. Treat them as provisional until scoring is measured from "
+    "the signal's stated distances rather than its absolute levels.",
+)
+
+
+def section_caveat():
+    if not SCORING_CAVEAT:
+        return ""
+    heading, detail, scope = SCORING_CAVEAT
+    return (
+        f'<div class="banner warn"><strong>&#9888; {esc(heading)}</strong>'
+        f"<p>{detail}</p>"
+        f'<p class="small">{scope}</p></div>'
+    )
+
 
 def render(stats, svg, js_points, events, scored, position_size, counts, uncharted):
     generated = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
 
     if stats:
         body = (
-            section_summary(stats)
+            section_caveat()
+            + section_summary(stats)
             + section_calculator(stats, position_size)
             + section_chart(stats, svg, uncharted)
             + section_facets(stats)
@@ -1103,6 +1139,7 @@ def render(stats, svg, js_points, events, scored, position_size, counts, unchart
         )
     else:
         body = (
+            section_caveat() +
             f'<div class="banner"><strong>{esc(PLACEHOLDER_TEXT)}</strong>'
             "<span class=\"note\">The summary table, the position size "
             "calculator and the equity curve appear here once score.py has "

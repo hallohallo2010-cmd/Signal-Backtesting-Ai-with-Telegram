@@ -34,6 +34,29 @@ MAX_HOLD_HOURS = 48
 DATA_HORIZON_WARN_DAYS = 50  # yfinance keeps ~60d of intraday data
 DOWNLOAD_ATTEMPTS = 3
 
+# Pip size per instrument, used only to record a second unit alongside points.
+# These are the standard conventions. Note the channels themselves are not
+# consistent about it: TNFX calls a 2.4 dollar gold move "+240 pips" (0.01),
+# Forexman calls a 3 dollar move "+30 pips" (0.1). Their claims are therefore
+# not comparable with each other, which is a reason to record our own unit
+# rather than quote theirs.
+PIP_SIZE_GOLD = 0.1
+PIP_SIZE_JPY = 0.01
+PIP_SIZE_FX = 0.0001
+
+CURRENCIES = ("EUR", "USD", "GBP", "JPY", "CHF", "AUD", "NZD", "CAD")
+
+
+def pip_size(symbol: str):
+    """Pip size for a symbol, or None if we have no convention for it."""
+    symbol = (symbol or "").upper()
+    if symbol in SYMBOL_MAP:
+        return PIP_SIZE_GOLD
+    if len(symbol) == 6 and symbol[:3] in CURRENCIES and symbol[3:] in CURRENCIES:
+        return PIP_SIZE_JPY if symbol[3:] == "JPY" else PIP_SIZE_FX
+    return None
+
+
 # Symbols this audit can price. Everything else is left unscored on purpose.
 SYMBOL_MAP = {
     "XAUUSD": TICKER,
@@ -64,6 +87,15 @@ OUT_COLUMNS = [
     "points_gross",
     "cost_points",
     "points_net",
+    # Points are price units, which are not comparable across instruments: a
+    # gold point is a dollar, a EURUSD point is ten thousand pips. Both of
+    # these are recorded per trade from the outset because a trade cannot be
+    # re-scored later -- yfinance serves roughly 60 days of intraday data, so
+    # the candles behind an old trade are simply gone. Deriving these later
+    # would be impossible, not merely expensive.
+    "risk_points",      # |entry - sl| as filled: the risk actually taken
+    "pips_net",         # points_net in pips, by the conventions above
+    "r_multiple",       # points_net / risk_points: unit-free, cross-instrument
     "bars_held",
     "same_candle_conflict",
     # Counterfactual: did price reach TP2/TP3 before the stop or the deadline,
@@ -337,6 +369,20 @@ def main():
                 else result["entry_price"] - result["exit_price"]
             )
             net = gross - COST_POINTS
+
+            # Risk as actually taken: the simulated fill against the stop, not
+            # the stated entry, which the channel may never have got.
+            risk = abs(result["entry_price"] - signal["sl"])
+            if risk <= 0:
+                # A stop sitting on the fill leaves no risk to divide by. It
+                # should not happen now the BUY STOP mis-parse is fixed, but a
+                # silent inf in an evidence file would be worse than a blank.
+                risk, r_mult = None, None
+            else:
+                r_mult = net / risk
+            size = pip_size(signal["symbol"])
+            pips = None if size is None else net / size
+
             new_rows.append(
                 {
                     "channel": signal["channel"],
@@ -356,6 +402,9 @@ def main():
                     "points_gross": round(gross, 3),
                     "cost_points": COST_POINTS,
                     "points_net": round(net, 3),
+                    "risk_points": "" if risk is None else round(risk, 5),
+                    "pips_net": "" if pips is None else round(pips, 1),
+                    "r_multiple": "" if r_mult is None else round(r_mult, 3),
                     "bars_held": result["bars"],
                     "same_candle_conflict": "yes" if result["conflict"] else "no",
                     "tp2_hit": level_reached(
