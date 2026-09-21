@@ -15,6 +15,7 @@ scored.csv is append-only: a signal already scored is never re-scored.
 """
 
 import csv
+import re
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -22,10 +23,20 @@ from pathlib import Path
 import pandas as pd
 import yfinance as yf
 
+import scoring
+
 SIGNALS_CSV = Path("signals.csv")
 SCORED_CSV = Path("scored.csv")
 
 TICKER = "GC=F"
+
+# Bump when the scoring model changes. Rows carrying a different version are
+# re-simulated rather than trusted, which is what lets a model fix reach the
+# trades already in the file instead of only the next ones.
+SCORING_MODEL = "2-basis-dual"
+
+# "XAUUSD BUY STOP 4341" is an order type, not a market entry.
+PENDING_ORDER = re.compile(r"\b(buy|sell)[\s-]*(stop|limit)\b", re.I)
 INTERVAL = "5m"
 PERIOD = "60d"
 
@@ -96,6 +107,16 @@ OUT_COLUMNS = [
     "risk_points",      # |entry - sl| as filled: the risk actually taken
     "pips_net",         # points_net in pips, by the conventions above
     "r_multiple",       # points_net / risk_points: unit-free, cross-instrument
+    # --- the headline model above is "what a follower got": the levels the
+    # channel posted, restated in futures terms, entered at the market price
+    # actually available. The columns below isolate the setup from the delay.
+    "basis_points",     # futures-minus-spot premium applied to the levels
+    "entry_mode",       # market | pending
+    "slippage_points",  # fill minus the basis-adjusted stated entry
+    "outcome_iso",      # same trade, levels re-anchored as distances from fill
+    "points_net_iso",
+    "r_multiple_iso",
+    "model_version",
     "bars_held",
     "same_candle_conflict",
     # Counterfactual: did price reach TP2/TP3 before the stop or the deadline,
@@ -163,6 +184,24 @@ def load_prices() -> pd.DataFrame:
     return df
 
 
+def drop_stale_rows():
+    """Remove rows scored under an older model, so re-simulation replaces them
+    instead of appending a second copy."""
+    if not SCORED_CSV.exists():
+        return
+    with SCORED_CSV.open("r", encoding="utf-8", newline="") as fh:
+        rows = [dict(r) for r in csv.DictReader(fh)]
+    keep = [r for r in rows if r.get("model_version") == SCORING_MODEL]
+    if len(keep) == len(rows):
+        return
+    with SCORED_CSV.open("w", encoding="utf-8", newline="") as fh:
+        writer = csv.DictWriter(fh, fieldnames=OUT_COLUMNS)
+        writer.writeheader()
+        for row in keep:
+            writer.writerow({c: row.get(c, "") for c in OUT_COLUMNS})
+    print(f"[info] dropped {len(rows) - len(keep)} row(s) for re-simulation")
+
+
 def load_scored_keys():
     """Keys already scored. Also migrates a scored.csv written by an older
     schema: appending to a narrower header would misalign every new row, so the
@@ -189,7 +228,21 @@ def load_scored_keys():
         added = [c for c in OUT_COLUMNS if c not in header]
         print(f"[info] widened {SCORED_CSV} schema; new blank column(s): {added}")
 
-    return {(r["channel"], r["message_id"]) for r in rows}
+    # Only rows scored under the current model count as done. A model change
+    # therefore re-simulates the whole file, which is the point: a scoring fix
+    # that only reached future trades would leave the old numbers standing.
+    current = {
+        (r["channel"], r["message_id"])
+        for r in rows
+        if r.get("model_version") == SCORING_MODEL
+    }
+    stale = len(rows) - len(current)
+    if stale:
+        print(
+            f"[info] {stale} row(s) were scored under an older model and will "
+            f"be re-simulated for {SCORING_MODEL}"
+        )
+    return current
 
 
 def walk(signal, times, o, h, l, c):
@@ -284,6 +337,7 @@ def main():
         print("[info] no signals to score")
         return 0
 
+    drop_stale_rows()
     already = load_scored_keys()
     pending, unsupported = [], []
 
@@ -313,6 +367,10 @@ def main():
                 "tp2": opt_float(row.get("tp2")),
                 "tp3": opt_float(row.get("tp3")),
                 "sl": float(row["sl"]),
+                # A stop/limit order is not filled at the market price when it
+                # is posted; it waits for its level. Detected from the text
+                # because parse.py does not model order type.
+                "pending": bool(PENDING_ORDER.search(row.get("raw_text") or "")),
             }
         )
 
@@ -350,11 +408,73 @@ def main():
         times = df.index
         o, h, l, c = (df[col].to_numpy() for col in ("Open", "High", "Low", "Close"))
 
+        rolls = scoring.contract_roll_dates(times[0], times[-1])
+        print(f"[info] contract roll boundaries in window: "
+              f"{[str(t.date()) for t in rolls] or 'none'}")
+
+        # The fill is the market open at the signal's timestamp. It does not
+        # depend on the basis, so it can be resolved first and then used to
+        # measure the basis.
+        for signal in pending:
+            idx = int(times.searchsorted(signal["ts"], side="left"))
+            signal["fill_idx"] = idx if idx < len(times) else None
+            signal["fill"] = float(o[idx]) if idx < len(times) else None
+
+        observations = [
+            (s["ts"], s["fill"] - float(s["entry_stated"]))
+            for s in pending
+            if s["fill"] is not None and str(s.get("entry_stated") or "").strip()
+        ]
+        print(f"[info] basis estimated from {len(observations)} signal(s) with a "
+              f"stated entry, {scoring.BASIS_WINDOW_DAYS}-day rolling median")
+
+        # The channel's next signal supersedes an unfilled pending order.
+        next_signal_at = {}
+        by_channel = {}
+        for s in sorted(pending, key=lambda s: s["ts"]):
+            by_channel.setdefault(s["channel"], []).append(s)
+        for chan, items in by_channel.items():
+            for a, b in zip(items, items[1:]):
+                next_signal_at[(chan, a["message_id"])] = b["ts"]
+
         new_rows, unresolved, out_of_window = [], 0, 0
+        missed, expired, conflicts = 0, 0, 0
         scored_at = now_utc()
 
         for signal in sorted(pending, key=lambda s: s["ts"]):
-            result = walk(signal, times, o, h, l, c)
+            is_long = signal["direction"] == "LONG"
+
+            basis = scoring.basis_at(observations, signal["ts"], rolls)
+            if basis is None or signal["fill"] is None:
+                unresolved += 1
+                continue
+
+            # Headline: the channel's own levels, restated in futures terms.
+            adj = scoring.adjust_levels(signal, basis)
+            head = dict(signal, tp1=adj["tp1"], tp2=adj["tp2"],
+                        tp3=adj["tp3"], sl=adj["sl"])
+
+            entry_mode = "pending" if signal.get("pending") else "market"
+            if entry_mode == "pending" and adj["entry"] is not None:
+                # Wait for the level to trade. Expire at the channel's next
+                # signal or PENDING_EXPIRY_HOURS, whichever comes first.
+                deadline = signal["ts"] + timedelta(hours=scoring.PENDING_EXPIRY_HOURS)
+                successor = next_signal_at.get((signal["channel"], signal["message_id"]))
+                if successor is not None:
+                    deadline = min(deadline, successor)
+                touch = None
+                for j in range(signal["fill_idx"], len(times)):
+                    if times[j] > deadline:
+                        break
+                    if float(l[j]) <= adj["entry"] <= float(h[j]):
+                        touch = j
+                        break
+                if touch is None:
+                    expired += 1
+                    continue
+                head = dict(head, ts=times[touch])
+
+            result = walk(head, times, o, h, l, c)
             if result is None:
                 unresolved += 1
                 continue
@@ -362,7 +482,14 @@ def main():
                 out_of_window += 1
                 continue
 
-            is_long = signal["direction"] == "LONG"
+            # A fill already beyond the trade's own target or stop is not a
+            # trade anyone could take; booking it as a win or a loss would be
+            # an invention. Counted and excluded.
+            if scoring.entry_already_past(adj, result["entry_price"], is_long):
+                missed += 1
+                continue
+            if result["conflict"]:
+                conflicts += 1
             gross = (
                 result["exit_price"] - result["entry_price"]
                 if is_long
@@ -382,6 +509,34 @@ def main():
                 r_mult = net / risk
             size = pip_size(signal["symbol"])
             pips = None if size is None else net / size
+
+            # Isolation mode: the same setup re-anchored on the fill, which
+            # hands the posting delay back to the channel. Reported beside the
+            # headline, never instead of it -- the gap between the two is what
+            # this channel costs a follower by posting late.
+            # Anchored on `head`, not `signal`: a pending order's headline walk
+            # starts at the touch, and the isolation walk has to start from the
+            # same fill or the two modes are measuring different trades.
+            iso_levels = scoring.distance_levels(signal, result["entry_price"])
+            outcome_iso = points_iso = r_iso = None
+            if iso_levels is not None:
+                iso_sig = dict(head, tp1=iso_levels["tp1"], tp2=iso_levels["tp2"],
+                               tp3=iso_levels["tp3"], sl=iso_levels["sl"])
+                iso_res = walk(iso_sig, times, o, h, l, c)
+                if iso_res and not iso_res.get("unresolvable"):
+                    iso_gross = (
+                        iso_res["exit_price"] - iso_res["entry_price"] if is_long
+                        else iso_res["entry_price"] - iso_res["exit_price"]
+                    )
+                    points_iso = iso_gross - COST_POINTS
+                    outcome_iso = iso_res["outcome"]
+                    iso_risk = abs(iso_res["entry_price"] - iso_levels["sl"])
+                    r_iso = points_iso / iso_risk if iso_risk > 0 else None
+
+            slippage = (
+                None if adj["entry"] is None
+                else result["entry_price"] - adj["entry"]
+            )
 
             new_rows.append(
                 {
@@ -405,6 +560,13 @@ def main():
                     "risk_points": "" if risk is None else round(risk, 5),
                     "pips_net": "" if pips is None else round(pips, 1),
                     "r_multiple": "" if r_mult is None else round(r_mult, 3),
+                    "basis_points": round(basis, 2),
+                    "entry_mode": entry_mode,
+                    "slippage_points": "" if slippage is None else round(slippage, 2),
+                    "outcome_iso": outcome_iso or "",
+                    "points_net_iso": "" if points_iso is None else round(points_iso, 3),
+                    "r_multiple_iso": "" if r_iso is None else round(r_iso, 3),
+                    "model_version": SCORING_MODEL,
                     "bars_held": result["bars"],
                     "same_candle_conflict": "yes" if result["conflict"] else "no",
                     "tp2_hit": level_reached(
@@ -425,6 +587,13 @@ def main():
                 if not exists:
                     writer.writeheader()
                 writer.writerows(new_rows)
+        if missed:
+            print(f"[info] {missed} signal(s) MISSED: the fill was already beyond "
+                  f"the trade's own target or stop; excluded from expectancy")
+        if expired:
+            print(f"[info] {expired} pending order(s) EXPIRED unfilled")
+        print(f"[info] {conflicts} trade(s) had TP and SL inside one candle; "
+              f"resolved as SL first")
         print(
             f"[info] scored {len(new_rows)} new signal(s); {unresolved} still open "
             f"(not enough price data yet); {out_of_window} before the data window"
