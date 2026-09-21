@@ -1,0 +1,44 @@
+name: parser check
+
+# Runs on pull requests only. The capture workflow needs Telegram secrets and
+# writes to the branch; this one reads the repository and nothing else.
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  parser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Full history so the base branch's signals.csv is available to
+          # compare against.
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # parse.py reads and writes CSVs with the standard library only.
+      - name: Fetch the base branch
+        run: git fetch origin "${{ github.base_ref }}" --depth=1
+
+      - name: Take the base branch's signals as the baseline
+        run: |
+          set -euo pipefail
+          if git show "origin/${{ github.base_ref }}:signals.csv" > /tmp/baseline-signals.csv 2>/dev/null; then
+            echo "baseline: $(( $(wc -l < /tmp/baseline-signals.csv) - 1 )) signal(s)"
+          else
+            echo "No signals.csv on the base branch; using an empty baseline."
+            printf 'channel,message_id,timestamp_utc,direction,symbol,entry,tp1,tp2,tp3,sl,raw_text,parse_confidence\n' > /tmp/baseline-signals.csv
+          fi
+
+      - name: Parser must not lose signals
+        run: python check_parse.py /tmp/baseline-signals.csv
