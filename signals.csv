@@ -1,4 +1,32 @@
 channel,message_id,timestamp_utc,direction,symbol,entry,tp1,tp2,tp3,sl,raw_text,parse_confidence
+@FREESIGNALSTOTRADEBYLENNART,59916,2026-09-18T16:18:35Z,LONG,CHFJPY,188.468,188.668,188.868,189.668,188.068,"🚀CHFJPY - BUY🚀
+
+Entry: 188.468
+
+Stopp-Loss: 188.068
+
+Take-Profit 1: 188.668
+Take-Profit 2: 188.868
+Take-Profit 3: 189.668
+
+📊3:1 Risk Reward 📊",1.0
+@FREESIGNALSTOTRADEBYLENNART,59937,2026-09-18T19:22:53Z,LONG,GBPUSD,1.3476,1.3481,1.3486,1.3506,1.3466,"🚀GBPUSD - BUY🚀
+
+Entry: 1.34760
+
+Stopp-Loss: 1.34660
+
+Take-Profit 1: 1.34810
+Take-Profit 2: 1.34860
+Take-Profit 3: 1.35060
+
+📊3:1 Risk Reward 📊",1.0
+@FXFARO_FREEGROUP,13462,2026-09-14T12:24:54Z,SHORT,CADJPY,,108.779,,,112.409,"Sell NOW CADJPY @ 111.204
+SL @ 112.409
+TP @ 108.779",0.9
+@FXFARO_FREEGROUP,13494,2026-09-16T10:42:41Z,LONG,GBPNZD,,2.37005,,,2.32284,"Buy NOW GBPNZD @ 2.33872
+SL @ 2.32284
+TP @ 2.37005",0.9
 @REALNATEFXC,5016,2026-09-15T10:42:48Z,LONG,XAUUSD,4274.0,4400.0,,,4250.0,"SIGNAL ALERT
 
 
@@ -1198,3 +1226,25 @@ SL @ 4397
 Trade accordingly and only trade with money you can afford to LOSE.
 
 DOUBLE LOTSIZE",1.0
+@s2tbylennart,161,2026-06-17T09:55:24Z,LONG,AUDNZD,1.21704,1.21854,1.22004,1.22604,1.21404,"🚀AUDNZD - BUY🚀
+
+Entry: 1.21704
+
+Stopp-Loss: 1.21404
+
+Take-Profit 1: 1.21854
+Take-Profit 2: 1.22004
+Take-Profit 3: 1.22604
+
+📊3:1 Risk Reward 📊",1.0
+@s2tbylennart,171,2026-06-17T09:55:25Z,SHORT,GBPUSD,1.34814,1.34664,1.34514,1.33914,1.35114,"🚀GBPUSD - SELL🚀
+
+Entry: 1.34814
+
+Stopp-Loss: 1.35114
+
+Take-Profit 1: 1.34664
+Take-Profit 2: 1.34514
+Take-Profit 3: 1.33914
+
+📊3:1 Risk Reward 📊",1.0
