@@ -7050,6 +7050,28 @@ SL @ 4095
 Trade accordingly and only trade with money you can afford to LOSE.
 
 DOUBLE LOTSIZE",1.0
+@fxtradingvision,89715,2026-11-08T23:03:57Z,SHORT,XAUUSD,4062.0,4058.0,4057.0,4040.0,4080.0,"NEW TRADE IDEA
+
+XAUUSD SELL 4062
+
+TP 1 4058
+TP 2 4057
+TP 3 4040
+
+SL @ 4080
+
+Trade accordingly and only trade with money you can afford to LOSE.",1.0
+@fxtradingvision,89718,2026-11-08T23:08:07Z,SHORT,XAUUSD,4069.0,4065.0,4064.0,4040.0,4085.0,"NEW TRADE IDEA
+
+XAUUSD SELL 4069
+
+TP 1 4065
+TP 2 4064
+TP 3 4040
+
+SL @ 4085
+
+Trade accordingly and only trade with money you can afford to LOSE.",1.0
 @s2tbylennart,161,2026-06-17T09:55:24Z,LONG,AUDNZD,1.21704,1.21854,1.22004,1.22604,1.21404,"🚀AUDNZD - BUY🚀
 
 Entry: 1.21704
